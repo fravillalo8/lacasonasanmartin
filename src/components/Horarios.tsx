@@ -262,7 +262,7 @@ export default function Horarios() {
         </div>
 
         <p className="text-center text-gray-500 text-xs sm:text-sm mt-10 sm:mt-12 max-w-xl mx-auto">
-          Otros locales (Emporio 79, RocHelo) ajustan sus horarios cada semana.
+          RocHelo ajusta sus horarios cada semana.
           Síguenos en{" "}
           <a
             href="https://www.instagram.com/casonasanmartin/"

@@ -4,7 +4,7 @@ import WordsPullUpMultiStyle from "./WordsPullUpMultiStyle";
 import AnimatedLetter from "./AnimatedLetter";
 
 const PARAGRAPH =
-  "Durante más de un siglo, este edificio ha sido testigo de la historia de Rinconada de Los Andes. Hoy, restaurada con respeto a su arquitectura colonial, La Casona San Martín reúne pizzería, café, emporio, moda sustentable y eventos culturales en un mismo lugar.";
+  "Este edificio ha sido testigo de la historia de Rinconada de Los Andes. Hoy, restaurada con respeto a su arquitectura colonial, Casona San Martín reúne pizzería, café, moda sustentable y eventos culturales en un mismo lugar.";
 
 export default function About() {
   const ref = useRef<HTMLParagraphElement>(null);

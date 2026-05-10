@@ -4,9 +4,9 @@ import WordsPullUp from "./WordsPullUp";
 
 const NAV_ITEMS = [
   { label: "Nuestra Historia", href: "#historia" },
-  { label: "Espacios", href: "#espacios" },
   { label: "Eventos", href: "#eventos" },
-  { label: "Emprendedores", href: "#emprendedores" },
+  { label: "Locales en la Casona", href: "#emprendedores" },
+  { label: "Arriendo de Local", href: "#cotizar" },
   { label: "Contacto", href: "#contacto" },
 ];
 
@@ -82,7 +82,7 @@ export default function Hero() {
                 className="font-serif font-medium leading-[0.85] tracking-[-0.04em] text-[22vw] sm:text-[20vw] md:text-[18vw] lg:text-[16vw] xl:text-[15vw]"
                 style={{ color: "#E1E0CC" }}
               >
-                <WordsPullUp text="La Casona" />
+                <WordsPullUp text="Casona San Martín" />
               </h1>
               <motion.p
                 className="mt-3 font-serif italic text-base sm:text-lg md:text-xl"
@@ -95,7 +95,7 @@ export default function Hero() {
                   ease: [0.16, 1, 0.3, 1],
                 }}
               >
-                San Martín · Rinconada de Los Andes
+                Rinconada de Los Andes
               </motion.p>
             </div>
             <div className="col-span-12 lg:col-span-4 flex flex-col gap-5 lg:pb-6">
@@ -111,7 +111,7 @@ export default function Hero() {
                 }}
               >
                 Patrimonio histórico en el corazón de Rinconada, Valle de
-                Aconcagua. Pizzería, café, emporio, moda sustentable y eventos
+                Aconcagua. Pizzería, café, moda sustentable y eventos
                 culturales — todo en un mismo lugar con carácter e historia.
               </motion.p>
               <motion.a

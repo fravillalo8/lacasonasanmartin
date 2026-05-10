@@ -31,19 +31,6 @@ const BRANDS: Brand[] = [
   },
   {
     number: "02",
-    name: "Emporio 79",
-    tagline: "Productos del valle y conveniencia",
-    logo: "/photos/logo-emporio79.jpg",
-    logoBg: "bg-[#3a1f5d]",
-    logoFit: "contain",
-    items: [
-      "Minimarket de conveniencia",
-      "Productos locales y artesanales",
-      "Vinos del valle de Aconcagua",
-    ],
-  },
-  {
-    number: "03",
     name: "Recircula Blue Point",
     tagline: "Moda circular que inspira",
     logo: "/photos/logo-recircula.jpg",
@@ -57,7 +44,7 @@ const BRANDS: Brand[] = [
     href: "https://www.instagram.com/recircula_blue_point/",
   },
   {
-    number: "04",
+    number: "03",
     name: "Tiempo de Cosecha",
     tagline: "Vinos y cocina del valle",
     logo: "/photos/logo-tiempodecosecha.png",
@@ -71,7 +58,7 @@ const BRANDS: Brand[] = [
     href: "https://www.tiempocosecha.cl/",
   },
   {
-    number: "05",
+    number: "04",
     name: "Emulen Pilates Center",
     tagline: "Movimiento consciente",
     logo: "/photos/ig-emulen-pilates.jpg",
@@ -85,7 +72,7 @@ const BRANDS: Brand[] = [
     href: "https://www.instagram.com/emulen.pilates/",
   },
   {
-    number: "06",
+    number: "05",
     name: "RocHelo",
     tagline: "Cafetería y heladería",
     logo: "/photos/logo-rochelo.jpg",
@@ -99,7 +86,7 @@ const BRANDS: Brand[] = [
     href: "https://www.instagram.com/rochelo/",
   },
   {
-    number: "07",
+    number: "06",
     name: "Andes Car Wash",
     tagline: "Auto lavado profesional",
     logo: "/photos/logo-andescarwash.png",
@@ -113,7 +100,7 @@ const BRANDS: Brand[] = [
     href: "https://www.instagram.com/andes_carwashcl/",
   },
   {
-    number: "08",
+    number: "07",
     name: "Hylba de Paiva · Fitness",
     tagline: "Gimnasia localizada brasileña",
     logo: "/photos/logo-hylba.jpg",
@@ -223,11 +210,11 @@ export default function Features() {
           <WordsPullUpMultiStyle
             segments={[
               {
-                text: "Ocho emprendimientos. Un mismo patio colonial.",
+                text: "Siete emprendimientos. Un mismo patio colonial.",
                 className: "text-cream",
               },
               {
-                text: "Cada marca con su historia. Toda La Casona como hogar.",
+                text: "Cada marca con su historia. Toda Casona San Martín como hogar.",
                 className: "italic text-gray-500",
               },
             ]}

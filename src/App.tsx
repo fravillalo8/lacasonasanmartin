@@ -4,6 +4,7 @@ import Gallery from "./components/Gallery";
 import Features from "./components/Features";
 import Eventos from "./components/Eventos";
 import Horarios from "./components/Horarios";
+import CotizarLocal from "./components/CotizarLocal";
 import Contacto from "./components/Contacto";
 import Footer from "./components/Footer";
 
@@ -16,6 +17,7 @@ export default function App() {
       <Features />
       <Eventos />
       <Horarios />
+      <CotizarLocal />
       <Contacto />
       <Footer />
     </main>

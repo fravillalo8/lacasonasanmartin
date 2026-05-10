@@ -15,16 +15,6 @@ const PHONES = [
     tel: "+5692650514",
     display: "+56 9 2650 514",
   },
-  {
-    label: "Pizzería Di María · Rinconada",
-    tel: "+56998456085",
-    display: "+56 9 9845 6085",
-  },
-  {
-    label: "Pizzería Di María · San Felipe",
-    tel: "+56932156542",
-    display: "+56 9 3215 6542",
-  },
 ];
 
 export default function Contacto() {

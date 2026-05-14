@@ -21,7 +21,7 @@ export default function Contacto() {
   return (
     <section
       id="contacto"
-      className="relative bg-black py-24 sm:py-32 px-4 sm:px-6 overflow-hidden"
+      className="relative bg-black py-14 sm:py-20 px-4 sm:px-6 overflow-hidden"
     >
       <div className="bg-noise pointer-events-none absolute inset-0 opacity-[0.12]" />
       <div className="relative mx-auto max-w-6xl">
@@ -61,7 +61,8 @@ export default function Contacto() {
           >
             <img
               src="/photos/ig-emprendedores.jpg"
-              alt="La Casona San Martín en Rinconada"
+              alt="Patio colonial de La Casona San Martín en Rinconada de Los Andes, Valle de Aconcagua"
+              loading="lazy"
               className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />

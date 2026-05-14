@@ -110,7 +110,7 @@ export default function Hero() {
           />
 
           {/* Nav — staggered entrance */}
-          <nav className="absolute left-1/2 top-0 z-20 -translate-x-1/2 bg-black rounded-b-2xl md:rounded-b-3xl px-4 py-2 md:px-8">
+          <nav aria-label="Navegación principal" className="absolute left-1/2 top-0 z-20 -translate-x-1/2 bg-black rounded-b-2xl md:rounded-b-3xl px-4 py-2 md:px-8">
             <ul className="flex gap-3 sm:gap-6 md:gap-10 lg:gap-12">
               {NAV_ITEMS.map((item, i) => (
                 <motion.li

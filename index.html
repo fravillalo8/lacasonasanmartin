@@ -119,6 +119,77 @@
     }
     </script>
 
+    <!-- JSON-LD: Eventos culturales recurrentes -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "EventSeries",
+          "name": "Eventos Culturales — Casona San Martín",
+          "description": "Ciclo permanente de eventos culturales en Casona San Martín: música en vivo, ferias, talleres y celebraciones en un espacio patrimonial colonial de Rinconada de Los Andes.",
+          "url": "https://lacasonasanmartin.cl/#eventos",
+          "location": {
+            "@type": "Place",
+            "name": "Casona San Martín",
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "Carretera San Martín 421, Paradero 10",
+              "addressLocality": "Rinconada de Los Andes",
+              "addressRegion": "Valparaíso",
+              "addressCountry": "CL"
+            }
+          },
+          "organizer": {
+            "@id": "https://lacasonasanmartin.cl/#business"
+          },
+          "image": "https://lacasonasanmartin.cl/photos/patio.jpg",
+          "subEvent": [
+            {
+              "@type": "Event",
+              "name": "Funk y Soul en vivo",
+              "description": "Música funk y soul en vivo en el patio colonial de Casona San Martín.",
+              "eventSchedule": {
+                "@type": "Schedule",
+                "byDay": "https://schema.org/Saturday",
+                "startTime": "20:00"
+              },
+              "eventStatus": "https://schema.org/EventScheduled",
+              "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+              "location": {
+                "@type": "Place",
+                "name": "Casona San Martín",
+                "address": {
+                  "@type": "PostalAddress",
+                  "streetAddress": "Carretera San Martín 421, Paradero 10",
+                  "addressLocality": "Rinconada de Los Andes",
+                  "addressCountry": "CL"
+                }
+              }
+            },
+            {
+              "@type": "Event",
+              "name": "Feria Navideña Casona San Martín",
+              "description": "Feria navideña con música, juegos y emprendedores locales del Valle de Aconcagua.",
+              "eventStatus": "https://schema.org/EventScheduled",
+              "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+              "location": {
+                "@type": "Place",
+                "name": "Casona San Martín",
+                "address": {
+                  "@type": "PostalAddress",
+                  "streetAddress": "Carretera San Martín 421, Paradero 10",
+                  "addressLocality": "Rinconada de Los Andes",
+                  "addressCountry": "CL"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
+
     <!-- Preload hero image -->
     <link rel="preload" as="image" href="/photos/hero.jpg" fetchpriority="high" />
 

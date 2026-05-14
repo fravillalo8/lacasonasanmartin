@@ -149,7 +149,8 @@ function BrandCard({ brand, index }: { brand: Brand; index: number }) {
       >
         <img
           src={brand.logo}
-          alt={brand.name}
+          alt={`Logo de ${brand.name} — ${brand.tagline}, en Casona San Martín, Rinconada de Los Andes`}
+          loading="lazy"
           className={`${brand.logoFit === "contain" ? "max-w-full max-h-full object-contain" : "w-full h-full object-cover"}`}
         />
       </div>
@@ -185,6 +186,7 @@ function BrandCard({ brand, index }: { brand: Brand; index: number }) {
         href={brand.href ?? "#"}
         target={brand.href ? "_blank" : undefined}
         rel={brand.href ? "noopener noreferrer" : undefined}
+        aria-label={`Conoce más sobre ${brand.name}`}
         className="mt-5 inline-flex items-center gap-2 text-xs sm:text-sm group"
         style={{ color: "#D4A574" }}
       >
@@ -202,7 +204,7 @@ export default function Features() {
   return (
     <section
       id="emprendedores"
-      className="relative bg-black py-24 sm:py-32 px-4 sm:px-6"
+      className="relative bg-black py-14 sm:py-20 px-4 sm:px-6"
     >
       <div className="bg-noise pointer-events-none absolute inset-0 opacity-[0.15]" />
       <div className="relative mx-auto max-w-7xl">

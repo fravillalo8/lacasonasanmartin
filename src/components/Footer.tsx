@@ -2,8 +2,7 @@ import InstagramIcon from "./icons/InstagramIcon";
 
 const NAV = [
   { label: "Nuestra Historia", href: "#historia" },
-  { label: "Galería", href: "#galeria" },
-  { label: "Emprendedores", href: "#emprendedores" },
+  { label: "Locales en la Casona", href: "#emprendedores" },
   { label: "Eventos", href: "#eventos" },
   { label: "Contacto", href: "#contacto" },
 ];
@@ -15,7 +14,8 @@ export default function Footer() {
         <a href="#" className="flex items-center gap-4">
           <img
             src="/photos/logo-casona.jpg"
-            alt="Casona San Martín"
+            alt="Logo de Casona San Martín, patrimonio histórico en Rinconada de Los Andes"
+            loading="lazy"
             className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover ring-1 ring-primary/30"
           />
           <div>
@@ -34,7 +34,7 @@ export default function Footer() {
           </div>
         </a>
 
-        <nav>
+        <nav aria-label="Navegación secundaria">
           <ul className="flex flex-wrap gap-x-6 gap-y-2 text-xs sm:text-sm">
             {NAV.map((item) => (
               <li key={item.href}>
@@ -67,9 +67,9 @@ export default function Footer() {
           © {new Date().getFullYear()} La Casona San Martín · Patrimonio
           histórico
         </p>
-        <p className="text-xs text-gray-500">
+        <address className="text-xs text-gray-500 not-italic">
           Carretera San Martín 421, Paradero 10, Rinconada de los Andes
-        </p>
+        </address>
       </div>
     </footer>
   );

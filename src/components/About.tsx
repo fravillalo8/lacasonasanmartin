@@ -17,7 +17,7 @@ export default function About() {
   const totalChars = PARAGRAPH.length;
 
   return (
-    <section id="historia" className="bg-black py-24 sm:py-32 px-4 sm:px-6">
+    <section id="historia" className="bg-black py-14 sm:py-20 px-4 sm:px-6">
       <div className="bg-[#101010] mx-auto max-w-6xl rounded-3xl px-6 sm:px-10 py-16 sm:py-24 text-center">
         <motion.div
           className="relative mx-auto mb-8 sm:mb-12 w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52"
@@ -42,7 +42,8 @@ export default function About() {
           />
           <img
             src="/photos/logo-casona.jpg"
-            alt="Casona San Martín · Rinconada de Los Andes"
+            alt="Logo de Casona San Martín, patrimonio histórico colonial en Rinconada de Los Andes, Valle de Aconcagua"
+            loading="lazy"
             className="relative w-full h-full rounded-full object-cover ring-2 ring-black"
           />
         </motion.div>

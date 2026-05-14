@@ -10,6 +10,8 @@ type Schedule = {
   logoFit?: "contain" | "cover";
   rows: { label: string; slots: string[] }[];
   note?: string;
+  phone?: string;
+  phoneDisplay?: string;
   ig?: string;
   igHandle?: string;
   web?: string;
@@ -120,7 +122,9 @@ const SCHEDULES: Schedule[] = [
         slots: ["19:00 — 19:45"],
       },
     ],
-    note: "12 clases mensuales · $55.000 · +56 9 7615 9062",
+    note: "12 clases mensuales · $55.000",
+    phone: "+56976159062",
+    phoneDisplay: "+56 9 7615 9062",
     ig: "https://www.instagram.com/hylbadepaiva.fitnesscoach45/",
     igHandle: "@hylbadepaiva.fitnesscoach45",
   },
@@ -154,7 +158,8 @@ function ScheduleCard({
         >
           <img
             src={schedule.logo}
-            alt={schedule.brand}
+            alt={`Logo de ${schedule.brand} — ${schedule.tagline}`}
+            loading="lazy"
             className={
               fit === "contain"
                 ? "max-w-full max-h-full object-contain"
@@ -222,6 +227,7 @@ function ScheduleCard({
             href={schedule.ig}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={`Instagram de ${schedule.brand}`}
             className="inline-flex items-center gap-1.5 text-xs group"
             style={{ color: "#D4A574" }}
           >
@@ -231,6 +237,16 @@ function ScheduleCard({
             </span>
           </a>
         )}
+        {schedule.phone && (
+          <a
+            href={`tel:${schedule.phone}`}
+            aria-label={`Llamar a ${schedule.brand}: ${schedule.phoneDisplay}`}
+            className="inline-flex items-center gap-1.5 text-xs group"
+            style={{ color: "#D4A574" }}
+          >
+            <span className="group-hover:underline">{schedule.phoneDisplay}</span>
+          </a>
+        )}
       </div>
     </motion.div>
   );
@@ -238,7 +254,7 @@ function ScheduleCard({
 
 export default function Horarios() {
   return (
-    <section id="horarios" className="bg-black py-24 sm:py-32 px-4 sm:px-6">
+    <section id="horarios" className="bg-black py-14 sm:py-20 px-4 sm:px-6">
       <div className="mx-auto max-w-7xl">
         <div className="text-center mb-12 sm:mb-16">
           <p

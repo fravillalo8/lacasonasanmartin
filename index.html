@@ -1,15 +1,23 @@
 <!doctype html>
 <html lang="es">
   <head>
-    <meta charset="UTF-8" />
-    <!-- Google Analytics 4 -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5LE0T6XXGW"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-5LE0T6XXGW');
-    </script>
+    <meta charset="UTF-8" />  <!-- Google Analytics 4 — Consent Mode v2 (Ley 19.628) -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('consent', 'default', {
+      analytics_storage: 'denied',
+      ad_storage: 'denied',
+      functionality_storage: 'denied',
+      personalization_storage: 'denied',
+      wait_for_update: 500
+    });
+  </script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-5LE0T6XXGW"></script>
+  <script>
+    gtag('js', new Date());
+    gtag('config', 'G-5LE0T6XXGW');
+  </script>
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
     <link rel="icon" type="image/png" sizes="256x256" href="/favicon-256.png" />
@@ -199,9 +207,10 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap"
       rel="stylesheet"
     />
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://lacasonasanmartin.cl/","url":"https://lacasonasanmartin.cl/","name":"Casona San Martín — Patrimonio Histórico en Rinconada | Valle del Aconcagua","description":"Inmueble patrimonial histórico en Rinconada, Valle del Aconcagua, Región de Valparaíso.","inLanguage":"es-CL","breadcrumb":{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Inicio","item":"https://lacasonasanmartin.cl/"}]}},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"¿Qué es la Casona San Martín?","acceptedAnswer":{"@type":"Answer","text":"La Casona San Martín es un inmueble de valor patrimonial histórico ubicado en Rinconada, Valle del Aconcagua, con historia vinculada a la fundación y desarrollo cultural de la región."}},{"@type":"Question","name":"¿Dónde está la Casona San Martín?","acceptedAnswer":{"@type":"Answer","text":"La Casona San Martín está en Rinconada, Región de Valparaíso, Chile, en el corazón del Valle del Aconcagua. Para visitas e información, visita lacasonasanmartin.cl."}},{"@type":"Question","name":"¿Se puede visitar la Casona San Martín?","acceptedAnswer":{"@type":"Answer","text":"Para información sobre visitas, eventos y actividades, consulta lacasonasanmartin.cl o contáctanos directamente. La casona está disponible para eventos y visitas programadas."}}]}]}</script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div id="app-loader" style="position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center"><div style="width:36px;height:36px;border:3px solid #f59e0b;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style></div></div>
     <noscript>
       <main style="font-family:Georgia,serif;color:#E1E0CC;background:#000;padding:2rem;max-width:800px;margin:0 auto">
         <h1>Casona San Martín — Rinconada de Los Andes</h1>
@@ -223,5 +232,6 @@
       </main>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
-  </body>
+    <script src="cookie-consent.js"></script>
+</body>
 </html>

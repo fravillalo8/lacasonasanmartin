@@ -230,3 +230,33 @@ class Merma(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     ingrediente = relationship("Ingrediente")
+
+
+class Proveedor(Base):
+    __tablename__ = "proveedores"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(200), nullable=False)
+    tipo = Column(String(50), default="")        # supermercado, mayorista, distribuidor, feria
+    telefono = Column(String(50), default="")
+    contacto = Column(String(200), default="")
+    direccion = Column(String(300), default="")
+    notas = Column(Text, default="")
+    activo = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    precios = relationship("PrecioProveedor", back_populates="proveedor", cascade="all, delete-orphan")
+
+
+class PrecioProveedor(Base):
+    __tablename__ = "precios_proveedor"
+
+    id = Column(Integer, primary_key=True, index=True)
+    proveedor_id = Column(Integer, ForeignKey("proveedores.id"))
+    ingrediente_id = Column(Integer, ForeignKey("ingredientes.id"))
+    precio = Column(Float, default=0)            # precio por unidad del ingrediente
+    fecha = Column(DateTime, default=datetime.utcnow)
+    notas = Column(String(300), default="")
+
+    proveedor = relationship("Proveedor", back_populates="precios")
+    ingrediente = relationship("Ingrediente")

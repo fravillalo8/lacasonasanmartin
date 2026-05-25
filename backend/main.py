@@ -8,7 +8,7 @@ load_dotenv()
 
 from database import init_db
 from routers import auth, ingredientes, compras, recetas, reportes, productos, mesas, comandas, ventas, reservas, clientes, caja, merma
-from routers import backup
+from routers import backup, proveedores, cotizador
 
 
 @asynccontextmanager
@@ -53,6 +53,8 @@ app.include_router(clientes.router)
 app.include_router(caja.router)
 app.include_router(merma.router)
 app.include_router(backup.router)
+app.include_router(proveedores.router)
+app.include_router(cotizador.router)
 
 
 @app.get("/api/health")

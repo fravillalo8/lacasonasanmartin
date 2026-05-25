@@ -13,6 +13,7 @@ import ChatBot from "./components/ChatBot";
 import EmulenPilates from "./pages/EmulenPilates";
 import TiempoDeCosecha from "./pages/TiempoDeCosecha";
 import InventarioApp from "./pages/inventario/InventarioApp";
+import Carta from "./pages/Carta";
 
 function Home() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
       <Route path="/mesa-central/*" element={<InventarioApp />} />
       <Route path="/mesadecontrol/*" element={<Navigate to="/mesa-central" replace />} />
       <Route path="/mesacentral/*" element={<Navigate to="/mesa-central" replace />} />
+      <Route path="/carta" element={<Carta />} />
     </Routes>
   );
 }

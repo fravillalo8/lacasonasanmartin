@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 from database import get_db
-from models import Producto
+from models import Producto, Receta
 from routers.auth import require_auth
 
 router = APIRouter(prefix="/api/productos", tags=["productos"])
@@ -18,6 +18,7 @@ class ProductoIn(BaseModel):
     categoria: str = ""
     foto: str = ""
     activo: bool = True
+    receta_id: Optional[int] = None
 
 
 class ProductoOut(BaseModel):
@@ -29,9 +30,21 @@ class ProductoOut(BaseModel):
     foto: str
     activo: bool
     agotado_hoy: bool = False
+    receta_id: Optional[int] = None
 
     class Config:
         from_attributes = True
+
+
+@router.get("/carta", response_model=list[ProductoOut])
+def carta_publica(db: Session = Depends(get_db)):
+    """Endpoint público: devuelve productos activos para la carta digital (sin auth)."""
+    return (
+        db.query(Producto)
+        .filter(Producto.activo == True)
+        .order_by(Producto.categoria, Producto.nombre)
+        .all()
+    )
 
 
 @router.get("", response_model=list[ProductoOut])

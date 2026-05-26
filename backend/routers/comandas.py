@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel
 from typing import Optional
 from database import get_db
-from models import Mesa, Comanda, ItemComanda, Producto, Venta
+from models import Mesa, Comanda, ItemComanda, Producto, Venta, Receta, ItemReceta, Ingrediente, MovimientoStock
 from routers.auth import require_auth
 
 router = APIRouter(prefix="/api/comandas", tags=["comandas"])
@@ -180,6 +180,8 @@ def agregar_item(comanda_id: int, data: ItemIn, db: Session = Depends(get_db), _
         db.add(item)
 
     db.flush()
+    # Expire c so the items relationship reloads from DB (includes the newly added item)
+    db.expire(c)
     c.total = sum(it.subtotal for it in c.items)
     db.commit()
 
@@ -199,7 +201,8 @@ def quitar_item(comanda_id: int, item_id: int, db: Session = Depends(get_db), _=
         raise HTTPException(404, "Item no encontrado")
     db.delete(item)
     db.flush()
-    c.total = sum(it.subtotal for it in c.items if it.id != item_id)
+    db.expire(c)
+    c.total = sum(it.subtotal for it in c.items)
     db.commit()
 
     return _build_comanda_out(db.query(Comanda).options(
@@ -238,8 +241,47 @@ def cobrar(comanda_id: int, data: PagoIn, db: Session = Depends(get_db), _=Depen
     c.closed_at = datetime.utcnow()
     if c.mesa:
         c.mesa.estado = "libre"
+
+    # ── Descontar ingredientes de inventario según receta vinculada ──────────
+    ingredientes_descontados = 0
+    for item in c.items:
+        prod = db.get(Producto, item.producto_id)
+        if not prod or not prod.receta_id:
+            continue
+        receta = (
+            db.query(Receta)
+            .filter(Receta.id == prod.receta_id, Receta.activo == True)
+            .first()
+        )
+        if not receta:
+            continue
+        # Factor: porciones_pedidas / porciones_que_rinde_la_receta
+        factor = item.cantidad / (receta.porciones or 1)
+        for ir in receta.items:
+            if not ir.ingrediente:
+                continue
+            necesario = round(ir.cantidad * factor, 6)
+            ir.ingrediente.stock = round(ir.ingrediente.stock - necesario, 6)
+            db.add(MovimientoStock(
+                ingrediente_id=ir.ingrediente_id,
+                tipo="SALIDA",
+                cantidad=-necesario,
+                motivo=f"Venta: {prod.nombre} ×{item.cantidad}",
+                referencia_id=comanda_id,
+                referencia_tipo="comanda",
+            ))
+            ingredientes_descontados += 1
+
     db.commit()
-    return {"ok": True, "subtotal": subtotal, "descuento": descuento, "propina": data.propina, "total": total_final, "vuelto": vuelto}
+    return {
+        "ok": True,
+        "subtotal": subtotal,
+        "descuento": descuento,
+        "propina": data.propina,
+        "total": total_final,
+        "vuelto": vuelto,
+        "ingredientes_descontados": ingredientes_descontados,
+    }
 
 
 @router.post("/{comanda_id}/cancelar")

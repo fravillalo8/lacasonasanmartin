@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { api } from './api/client'
 import type { Mesa, MesaIn, Comanda, Producto, PagoOut } from './api/client'
 import {
-  Plus, X, Trash2, Settings, Users, ChevronRight,
+  Plus, X, Trash2, Settings, Users, ChevronRight, Minus, Clock, FileText,
   CreditCard, Banknote, Smartphone, ArrowLeftRight, Check, Printer, Percent, ShoppingBag,
 } from 'lucide-react'
 
@@ -20,6 +20,14 @@ const ESTADO_LABEL: Record<string, string> = {
   libre: 'Libre',
   ocupada: 'Ocupada',
   cuenta: 'Cuenta',
+}
+
+function minutos(iso: string): string {
+  const diff = Date.now() - new Date(iso + 'Z').getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'ahora'
+  if (m === 1) return '1 min'
+  return `${m} min`
 }
 
 // ─── Modal nueva mesa ──────────────────────────────────────────────────────
@@ -157,6 +165,27 @@ function ComandaPanel({
     }
   }
 
+  async function cambiarCantidad(item_id: number, nueva: number) {
+    if (!comanda) return
+    try {
+      const updated = await api.comandas.cambiarCantidad(comanda.id, item_id, nueva)
+      setComanda(updated)
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : 'Error')
+    }
+  }
+
+  async function solicitarCuenta() {
+    if (!comanda) return
+    try {
+      await api.comandas.pedirCuenta(comanda.id)
+      onUpdate()
+      onClose()
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : 'Error')
+    }
+  }
+
   const descPct = parseFloat(descuentoPct) || 0
   const propina = parseFloat(propinaVal) || 0
   const subtotal = comanda?.total ?? 0
@@ -273,12 +302,26 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
           <div>
-            <p className="font-bold text-stone-800 text-lg">{panelTitle}</p>
-            {mesa && (
-              <p className="text-xs text-stone-400 flex items-center gap-1 mt-0.5">
-                <Users size={12} /> {mesa.capacidad} personas
-              </p>
-            )}
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-stone-800 text-lg">{panelTitle}</p>
+              {comanda?.numero_ticket && (
+                <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                  #{comanda.numero_ticket}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 mt-0.5">
+              {mesa && (
+                <p className="text-xs text-stone-400 flex items-center gap-1">
+                  <Users size={12} /> {mesa.capacidad} personas
+                </p>
+              )}
+              {comanda?.created_at && (
+                <p className="text-xs text-stone-400 flex items-center gap-1">
+                  <Clock size={12} /> {minutos(comanda.created_at)}
+                </p>
+              )}
+            </div>
           </div>
           <button type="button" title="Cerrar" onClick={onClose} className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200">
             <X size={16} />
@@ -343,21 +386,28 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
               ) : (
                 <ul className="divide-y divide-stone-50 px-3">
                   {comanda.items.map(it => (
-                    <li key={it.id} className="flex items-center justify-between py-2 gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-stone-700 truncate">{it.nombre_producto}</p>
-                        <p className="text-xs text-stone-400">{it.cantidad}× {clpFormat(it.precio_unitario)}</p>
+                    <li key={it.id} className="py-2">
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <p className="text-xs font-medium text-stone-700 flex-1 truncate">{it.nombre_producto}</p>
+                        <span className="text-xs font-semibold text-stone-700 shrink-0">{clpFormat(it.subtotal)}</span>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-xs font-semibold text-stone-700">{clpFormat(it.subtotal)}</span>
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          title="Quitar item"
-                          onClick={() => quitar(it.id)}
-                          className="w-5 h-5 rounded-full bg-red-50 flex items-center justify-center text-red-400 hover:bg-red-100"
+                          onClick={() => cambiarCantidad(it.id, it.cantidad - 1)}
+                          className="w-5 h-5 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-red-100 hover:text-red-500"
                         >
-                          <X size={10} />
+                          <Minus size={9} />
                         </button>
+                        <span className="text-xs font-bold text-stone-800 min-w-[1.4rem] text-center">{it.cantidad}</span>
+                        <button
+                          type="button"
+                          onClick={() => cambiarCantidad(it.id, it.cantidad + 1)}
+                          className="w-5 h-5 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-amber-100 hover:text-amber-600"
+                        >
+                          <Plus size={9} />
+                        </button>
+                        <span className="text-xs text-stone-400 ml-1">{clpFormat(it.precio_unitario)} c/u</span>
                       </div>
                     </li>
                   ))}
@@ -373,15 +423,28 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
                 <span className="text-lg font-bold text-stone-800">{clpFormat(subtotal)}</span>
               </div>
               {!showCobrar ? (
-                <button
-                  type="button"
-                  onClick={() => setShowCobrar(true)}
-                  disabled={!comanda || comanda.items.length === 0}
-                  className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
-                >
-                  <ArrowLeftRight size={15} />
-                  Cobrar mesa
-                </button>
+                <div className="space-y-2">
+                  {mesa && (
+                    <button
+                      type="button"
+                      onClick={solicitarCuenta}
+                      disabled={!comanda || comanda.items.length === 0}
+                      className="w-full border border-orange-200 text-orange-600 hover:bg-orange-50 disabled:opacity-40 font-medium py-2 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+                    >
+                      <FileText size={14} />
+                      Pedir cuenta
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowCobrar(true)}
+                    disabled={!comanda || comanda.items.length === 0}
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+                  >
+                    <ArrowLeftRight size={15} />
+                    Cobrar mesa
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-2">
                   {/* Descuento y propina */}
@@ -474,6 +537,7 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
 export default function Mesas() {
   const [mesas, setMesas] = useState<Mesa[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
+  const [comandasActivas, setComandasActivas] = useState<Comanda[]>([])
   const [loading, setLoading] = useState(true)
   const [showNueva, setShowNueva] = useState(false)
   const [mesaActiva, setMesaActiva] = useState<Mesa | null>(null)
@@ -486,15 +550,27 @@ export default function Mesas() {
   async function reload() {
     setLoading(true)
     try {
-      const [m, p] = await Promise.all([api.mesas.list(), api.productos.list(true)])
+      const [m, p, cas] = await Promise.all([
+        api.mesas.list(),
+        api.productos.list(true),
+        api.comandas.activos(),
+      ])
       setMesas(m)
       setProductos(p)
+      setComandasActivas(cas)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { reload() }, [])
+  useEffect(() => {
+    reload()
+    const interval = setInterval(() => {
+      api.mesas.list().then(m => setMesas(m)).catch(() => {})
+      api.comandas.activos().then(cas => setComandasActivas(cas)).catch(() => {})
+    }, 20000)
+    return () => clearInterval(interval)
+  }, [])
 
   async function crearMesa(data: MesaIn) {
     await api.mesas.create(data)
@@ -566,42 +642,61 @@ export default function Mesas() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {mesas.map(m => (
-            <div
-              key={m.id}
-              className={`relative rounded-2xl border-2 p-4 cursor-pointer transition-all hover:shadow-md select-none ${ESTADO_COLOR[m.estado]}`}
-              onClick={() => setMesaActiva(m)}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <p className="font-bold text-2xl leading-none">{m.numero}</p>
-                  {m.nombre && <p className="text-xs mt-0.5 opacity-70">{m.nombre}</p>}
+          {(() => {
+            const comandaByMesa: Record<number, Comanda> = {}
+            for (const c of comandasActivas) {
+              if (c.mesa_id !== null) comandaByMesa[c.mesa_id] = c
+            }
+            return mesas.map(m => {
+              const comanda = comandaByMesa[m.id]
+              return (
+                <div
+                  key={m.id}
+                  className={`relative rounded-2xl border-2 p-4 cursor-pointer transition-all hover:shadow-md select-none ${ESTADO_COLOR[m.estado]}`}
+                  onClick={() => setMesaActiva(m)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="font-bold text-2xl leading-none">{m.numero}</p>
+                      {m.nombre && <p className="text-xs mt-0.5 opacity-70">{m.nombre}</p>}
+                    </div>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      m.estado === 'libre' ? 'bg-emerald-200 text-emerald-800' :
+                      m.estado === 'ocupada' ? 'bg-amber-200 text-amber-900' : 'bg-red-200 text-red-800'
+                    }`}>
+                      {ESTADO_LABEL[m.estado]}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs opacity-60 flex items-center gap-1">
+                        <Users size={11} /> {m.capacidad}
+                      </span>
+                      {comanda && (
+                        <span className="text-xs opacity-70 flex items-center gap-1">
+                          <Clock size={10} /> {minutos(comanda.created_at)}
+                          {comanda.numero_ticket && (
+                            <span className="ml-1 opacity-60">#{comanda.numero_ticket}</span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={e => { e.stopPropagation(); eliminarMesa(m) }}
+                        disabled={deletingId === m.id || m.estado !== 'libre'}
+                        className="w-6 h-6 rounded-full opacity-0 group-hover:opacity-100 bg-white/50 flex items-center justify-center hover:bg-red-100 text-red-400 disabled:opacity-20 transition-opacity"
+                        title={m.estado !== 'libre' ? 'Solo se puede eliminar si está libre' : 'Eliminar mesa'}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                      <ChevronRight size={15} className="opacity-40" />
+                    </div>
+                  </div>
                 </div>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                  m.estado === 'libre' ? 'bg-emerald-200 text-emerald-800' :
-                  m.estado === 'ocupada' ? 'bg-amber-200 text-amber-900' : 'bg-red-200 text-red-800'
-                }`}>
-                  {ESTADO_LABEL[m.estado]}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs opacity-60 flex items-center gap-1">
-                  <Users size={11} /> {m.capacidad}
-                </span>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={e => { e.stopPropagation(); eliminarMesa(m) }}
-                    disabled={deletingId === m.id || m.estado !== 'libre'}
-                    className="w-6 h-6 rounded-full opacity-0 group-hover:opacity-100 bg-white/50 flex items-center justify-center hover:bg-red-100 text-red-400 disabled:opacity-20 transition-opacity"
-                    title={m.estado !== 'libre' ? 'Solo se puede eliminar si está libre' : 'Eliminar mesa'}
-                  >
-                    <Trash2 size={11} />
-                  </button>
-                  <ChevronRight size={15} className="opacity-40" />
-                </div>
-              </div>
-            </div>
-          ))}
+              )
+            })
+          })()}
         </div>
       )}
 

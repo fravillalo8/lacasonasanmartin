@@ -110,9 +110,11 @@ class Producto(Base):
     foto = Column(Text, default="")          # URL de imagen
     activo = Column(Boolean, default=True)
     agotado_hoy = Column(Boolean, default=False)
+    receta_id = Column(Integer, ForeignKey("recetas.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     items_comanda = relationship("ItemComanda", back_populates="producto")
+    receta = relationship("Receta")
 
 
 class Mesa(Base):
@@ -138,6 +140,7 @@ class Comanda(Base):
     estado = Column(String(20), default="abierta")  # abierta, cerrada, cancelada
     total = Column(Float, default=0)
     notas = Column(Text, default="")
+    numero_ticket = Column(Integer, nullable=True)  # número correlativo del día
     created_at = Column(DateTime, default=datetime.utcnow)
     closed_at = Column(DateTime, nullable=True)
 
@@ -156,6 +159,7 @@ class ItemComanda(Base):
     precio_unitario = Column(Float, default=0)
     subtotal = Column(Float, default=0)
     notas = Column(String(300), default="")
+    listo = Column(Boolean, default=False)   # cocina marca el item como preparado
 
     comanda = relationship("Comanda", back_populates="items")
     producto = relationship("Producto", back_populates="items_comanda")

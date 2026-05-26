@@ -36,6 +36,7 @@ class ItemOut(BaseModel):
     precio_unitario: float
     subtotal: float
     notas: str
+    listo: bool = False
 
     class Config:
         from_attributes = True
@@ -45,6 +46,7 @@ class ComandaOut(BaseModel):
     id: int
     mesa_id: Optional[int]
     numero_mesa: int
+    numero_ticket: Optional[int]
     tipo: str
     cliente_nombre: str
     estado: str
@@ -55,6 +57,10 @@ class ComandaOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CantidadIn(BaseModel):
+    cantidad: int
 
 
 def _build_comanda_out(c: Comanda) -> ComandaOut:
@@ -68,11 +74,13 @@ def _build_comanda_out(c: Comanda) -> ComandaOut:
             precio_unitario=it.precio_unitario,
             subtotal=it.subtotal,
             notas=it.notas,
+            listo=bool(it.listo),
         ))
     return ComandaOut(
         id=c.id,
         mesa_id=c.mesa_id,
         numero_mesa=c.mesa.numero if c.mesa else 0,
+        numero_ticket=c.numero_ticket,
         tipo=c.tipo if c.tipo else "mesa",
         cliente_nombre=c.cliente_nombre if c.cliente_nombre else "",
         estado=c.estado,
@@ -81,6 +89,18 @@ def _build_comanda_out(c: Comanda) -> ComandaOut:
         created_at=c.created_at.isoformat() if c.created_at else "",
         items=items,
     )
+
+
+def _asignar_ticket(db: Session) -> int:
+    """Genera el número de ticket correlativo del día (reinicia cada día)."""
+    inicio_hoy = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    ultimo = (
+        db.query(Comanda.numero_ticket)
+        .filter(Comanda.created_at >= inicio_hoy, Comanda.numero_ticket.isnot(None))
+        .order_by(Comanda.numero_ticket.desc())
+        .first()
+    )
+    return (ultimo[0] + 1) if ultimo else 1
 
 
 @router.post("/abrir/{mesa_id}", response_model=ComandaOut)
@@ -94,7 +114,7 @@ def abrir_comanda(mesa_id: int, db: Session = Depends(get_db), _=Depends(require
             joinedload(Comanda.mesa),
             joinedload(Comanda.items).joinedload(ItemComanda.producto)
         ).filter(Comanda.id == existente.id).first())
-    c = Comanda(mesa_id=mesa_id)
+    c = Comanda(mesa_id=mesa_id, numero_ticket=_asignar_ticket(db))
     mesa.estado = "ocupada"
     db.add(c)
     db.commit()
@@ -120,7 +140,7 @@ def vista_cocina(db: Session = Depends(get_db), _=Depends(require_auth)):
 
 @router.post("/delivery", response_model=ComandaOut)
 def abrir_delivery(data: DeliveryIn, db: Session = Depends(get_db), _=Depends(require_auth)):
-    c = Comanda(tipo="delivery", cliente_nombre=data.cliente_nombre)
+    c = Comanda(tipo="delivery", cliente_nombre=data.cliente_nombre, numero_ticket=_asignar_ticket(db))
     db.add(c)
     db.commit()
     db.refresh(c)
@@ -297,3 +317,67 @@ def cancelar(comanda_id: int, db: Session = Depends(get_db), _=Depends(require_a
         c.mesa.estado = "libre"
     db.commit()
     return {"ok": True}
+
+
+@router.patch("/{comanda_id}/items/{item_id}", response_model=ComandaOut)
+def cambiar_cantidad(comanda_id: int, item_id: int, data: CantidadIn,
+                     db: Session = Depends(get_db), _=Depends(require_auth)):
+    """Cambia la cantidad de un item (mínimo 1). Si llega a 0 lo elimina."""
+    c = db.query(Comanda).filter(Comanda.id == comanda_id, Comanda.estado == "abierta").first()
+    if not c:
+        raise HTTPException(404, "Comanda no encontrada o cerrada")
+    item = db.query(ItemComanda).filter(ItemComanda.id == item_id, ItemComanda.comanda_id == comanda_id).first()
+    if not item:
+        raise HTTPException(404, "Item no encontrado")
+
+    if data.cantidad <= 0:
+        db.delete(item)
+    else:
+        item.cantidad = data.cantidad
+        item.subtotal = item.precio_unitario * data.cantidad
+
+    db.flush()
+    db.expire(c)
+    c.total = sum(it.subtotal for it in c.items)
+    db.commit()
+
+    return _build_comanda_out(db.query(Comanda).options(
+        joinedload(Comanda.mesa),
+        joinedload(Comanda.items).joinedload(ItemComanda.producto)
+    ).filter(Comanda.id == comanda_id).first())
+
+
+@router.post("/{comanda_id}/items/{item_id}/listo", response_model=ComandaOut)
+def toggle_item_listo(comanda_id: int, item_id: int,
+                      db: Session = Depends(get_db), _=Depends(require_auth)):
+    """Cocina marca/desmarca un item como preparado."""
+    item = db.query(ItemComanda).filter(
+        ItemComanda.id == item_id, ItemComanda.comanda_id == comanda_id
+    ).first()
+    if not item:
+        raise HTTPException(404, "Item no encontrado")
+    item.listo = not item.listo
+    db.commit()
+
+    return _build_comanda_out(db.query(Comanda).options(
+        joinedload(Comanda.mesa),
+        joinedload(Comanda.items).joinedload(ItemComanda.producto)
+    ).filter(Comanda.id == comanda_id).first())
+
+
+@router.post("/{comanda_id}/pedir-cuenta", response_model=ComandaOut)
+def pedir_cuenta(comanda_id: int, db: Session = Depends(get_db), _=Depends(require_auth)):
+    """El mozo marca que el cliente quiere la cuenta (mesa pasa a estado 'cuenta')."""
+    c = db.query(Comanda).options(joinedload(Comanda.mesa)).filter(
+        Comanda.id == comanda_id, Comanda.estado == "abierta"
+    ).first()
+    if not c:
+        raise HTTPException(404, "Comanda no encontrada o cerrada")
+    if c.mesa:
+        c.mesa.estado = "cuenta"
+    db.commit()
+
+    return _build_comanda_out(db.query(Comanda).options(
+        joinedload(Comanda.mesa),
+        joinedload(Comanda.items).joinedload(ItemComanda.producto)
+    ).filter(Comanda.id == comanda_id).first())

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { api } from './api/client'
 import type { Comanda } from './api/client'
-import { RefreshCw, Clock, UtensilsCrossed } from 'lucide-react'
+import { RefreshCw, Clock, UtensilsCrossed, CheckCircle2 } from 'lucide-react'
 
 function minutos(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -22,6 +22,7 @@ export default function Cocina() {
   const [comandas, setComandas] = useState<Comanda[]>([])
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(new Date())
+  const [toggling, setToggling] = useState<number | null>(null)
 
   const reload = useCallback(async () => {
     try {
@@ -34,6 +35,18 @@ export default function Cocina() {
       setLoading(false)
     }
   }, [])
+
+  async function toggleListo(comanda_id: number, item_id: number) {
+    setToggling(item_id)
+    try {
+      const updated = await api.comandas.toggleListo(comanda_id, item_id)
+      setComandas(prev => prev.map(c => c.id === comanda_id ? updated : c))
+    } catch {
+      // silent
+    } finally {
+      setToggling(null)
+    }
+  }
 
   useEffect(() => {
     reload()
@@ -85,8 +98,12 @@ export default function Cocina() {
               {/* Mesa + tiempo */}
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-2xl font-black text-white">Mesa {c.numero_mesa}</p>
-                  <p className="text-xs text-stone-400 mt-0.5">Comanda #{c.id}</p>
+                  <p className="text-2xl font-black text-white">
+                    {c.tipo === 'delivery' ? `🛍 ${c.cliente_nombre || 'Para llevar'}` : `Mesa ${c.numero_mesa}`}
+                  </p>
+                  <p className="text-xs text-stone-400 mt-0.5">
+                    {c.numero_ticket ? `Ticket #${c.numero_ticket}` : `Comanda #${c.id}`}
+                  </p>
                 </div>
                 <div className="text-right">
                   <div className="flex items-center gap-1 text-amber-400 font-semibold text-sm">
@@ -102,19 +119,54 @@ export default function Cocina() {
               {/* Items */}
               <div className="space-y-2">
                 {c.items.map(it => (
-                  <div key={it.id} className="flex items-start gap-3 bg-stone-700/50 rounded-xl px-3 py-2">
-                    <span className="text-2xl font-black text-amber-400 leading-none min-w-[2rem] text-center">
+                  <div
+                    key={it.id}
+                    className={`flex items-start gap-3 rounded-xl px-3 py-2 transition-colors ${
+                      it.listo ? 'bg-emerald-900/40 border border-emerald-700/50' : 'bg-stone-700/50'
+                    }`}
+                  >
+                    <span className={`text-2xl font-black leading-none min-w-[2rem] text-center ${it.listo ? 'text-emerald-400' : 'text-amber-400'}`}>
                       {it.cantidad}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white leading-tight">{it.nombre_producto}</p>
+                      <p className={`text-sm font-semibold leading-tight ${it.listo ? 'line-through text-stone-400' : 'text-white'}`}>
+                        {it.nombre_producto}
+                      </p>
                       {it.notas && (
                         <p className="text-xs text-amber-300 mt-0.5">⚠ {it.notas}</p>
                       )}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleListo(c.id, it.id)}
+                      disabled={toggling === it.id}
+                      className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                        it.listo
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                          : 'bg-stone-600 hover:bg-emerald-600 text-stone-300 hover:text-white'
+                      }`}
+                      title={it.listo ? 'Marcar como pendiente' : 'Marcar como listo'}
+                    >
+                      <CheckCircle2 size={15} />
+                    </button>
                   </div>
                 ))}
               </div>
+
+              {/* Progreso */}
+              {c.items.length > 0 && (
+                <div className="flex items-center gap-2 pt-1">
+                  <div className="flex-1 h-1.5 bg-stone-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                      style={{ width: `${(c.items.filter(i => i.listo).length / c.items.length) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-stone-400 shrink-0">
+                    {c.items.filter(i => i.listo).length}/{c.items.length}
+                  </span>
+                </div>
+              )}
 
               {/* Notas de comanda */}
               {c.notas && (

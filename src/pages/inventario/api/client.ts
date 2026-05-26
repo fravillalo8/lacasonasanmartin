@@ -176,6 +176,15 @@ export const api = {
     cancelar: (id: number) =>
       request<{ ok: boolean }>(`/comandas/${id}/cancelar`, { method: 'POST' }),
     cocina: () => request<Comanda[]>('/comandas/cocina'),
+    cambiarCantidad: (id: number, item_id: number, cantidad: number) =>
+      request<Comanda>(`/comandas/${id}/items/${item_id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ cantidad }),
+      }),
+    toggleListo: (id: number, item_id: number) =>
+      request<Comanda>(`/comandas/${id}/items/${item_id}/listo`, { method: 'POST' }),
+    pedirCuenta: (id: number) =>
+      request<Comanda>(`/comandas/${id}/pedir-cuenta`, { method: 'POST' }),
   },
 
   // ─── Ventas ──────────────────────────────────────────────────────────────
@@ -234,6 +243,35 @@ export const api = {
         '/mermas', { method: 'POST', body: JSON.stringify(data) }
       ),
     resumen: () => request<MermaResumen>('/mermas/resumen'),
+  },
+
+  // ─── Proveedores ──────────────────────────────────────────────────────────
+  proveedores: {
+    list: () => request<Proveedor[]>('/proveedores'),
+    create: (data: ProveedorIn) =>
+      request<Proveedor>('/proveedores', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: ProveedorIn) =>
+      request<Proveedor>(`/proveedores/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) =>
+      request<{ ok: boolean }>(`/proveedores/${id}`, { method: 'DELETE' }),
+    precios: (id: number) =>
+      request<PrecioProveedor[]>(`/proveedores/${id}/precios`),
+    upsertPrecio: (id: number, data: PrecioIn) =>
+      request<PrecioProveedor>(`/proveedores/${id}/precios`, { method: 'POST', body: JSON.stringify(data) }),
+    deletePrecio: (provId: number, precioId: number) =>
+      request<{ ok: boolean }>(`/proveedores/${provId}/precios/${precioId}`, { method: 'DELETE' }),
+  },
+
+  // ─── Cotizador ────────────────────────────────────────────────────────────
+  cotizador: {
+    comparar: () => request<ComparacionData>('/cotizador/comparar'),
+    pedidoOptimo: (items: { ingrediente_id: number; cantidad: number }[]) =>
+      request<PedidoOptimo>('/cotizador/pedido-optimo', {
+        method: 'POST',
+        body: JSON.stringify({ items }),
+      }),
+    prediccion: (dias = 30, diasObjetivo = 14) =>
+      request<PrediccionCompras>(`/cotizador/prediccion-compras?dias=${dias}&dias_objetivo=${diasObjetivo}`),
   },
 }
 
@@ -512,12 +550,14 @@ export interface ItemComanda {
   precio_unitario: number
   subtotal: number
   notas: string
+  listo: boolean
 }
 
 export interface Comanda {
   id: number
   mesa_id: number | null
   numero_mesa: number
+  numero_ticket: number | null
   tipo: string
   cliente_nombre: string
   estado: 'abierta' | 'cerrada' | 'cancelada'
@@ -652,4 +692,106 @@ export interface PYLMes {
   mermas: number
   egresos: number
   resultado: number
+}
+
+export interface Proveedor {
+  id: number
+  nombre: string
+  tipo: string
+  telefono: string
+  contacto: string
+  direccion: string
+  notas: string
+  activo: boolean
+}
+
+export interface ProveedorIn {
+  nombre: string
+  tipo?: string
+  telefono?: string
+  contacto?: string
+  direccion?: string
+  notas?: string
+}
+
+export interface PrecioProveedor {
+  id: number
+  proveedor_id: number
+  ingrediente_id: number
+  ingrediente_nombre: string
+  ingrediente_unidad: string
+  precio: number
+  fecha: string | null
+  notas: string
+}
+
+export interface PrecioIn {
+  ingrediente_id: number
+  precio: number
+  notas?: string
+}
+
+export interface ComparacionFila {
+  ingrediente_id: number
+  ingrediente: string
+  unidad: string
+  stock_actual: number
+  costo_actual: number
+  precios: Record<number, number | null>
+  fechas: Record<number, string | null>
+  notas: Record<number, string | null>
+  min_precio: number | null
+  mejor_proveedor_id: number | null
+}
+
+export interface ComparacionData {
+  proveedores: { id: number; nombre: string; tipo: string }[]
+  filas: ComparacionFila[]
+}
+
+export interface PedidoItem {
+  ingrediente_id: number
+  nombre: string
+  unidad: string
+  cantidad: number
+  precio_unitario: number
+  subtotal: number
+  ahorro_vs_actual: number
+  precio_actual: number
+}
+
+export interface PedidoGrupo {
+  proveedor_id: number
+  proveedor: string
+  tipo: string
+  telefono: string
+  items: PedidoItem[]
+  total: number
+}
+
+export interface PedidoOptimo {
+  grupos: PedidoGrupo[]
+  sin_precio: { ingrediente_id: number; nombre: string; cantidad: number; unidad: string }[]
+  total_general: number
+  ahorro_estimado: number
+}
+
+export interface PrediccionIngrediente {
+  ingrediente_id: number
+  nombre: string
+  unidad: string
+  stock_actual: number
+  stock_minimo: number
+  consumo_diario: number
+  consumo_periodo: number
+  dias_hasta_agotarse: number | null
+  cantidad_sugerida: number
+  urgencia: 'critico' | 'alto' | 'medio' | 'ok' | 'sin_datos'
+}
+
+export interface PrediccionCompras {
+  periodo_dias: number
+  dias_objetivo: number
+  ingredientes: PrediccionIngrediente[]
+  resumen: { criticos: number; altos: number; con_datos: number }
 }

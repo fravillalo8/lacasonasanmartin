@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
+import { api } from '../api/client'
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -16,6 +18,8 @@ import {
   Trash2,
   QrCode,
   Settings,
+  Truck,
+  Calculator,
 } from 'lucide-react'
 import type { Role } from '../InventarioApp'
 
@@ -47,6 +51,8 @@ const NAV: NavItem[] = [
   { to: '/mesa-central/compras', label: 'Compras', icon: ShoppingCart, roles: ['admin'] },
   { to: '/mesa-central/ingredientes', label: 'Ingredientes', icon: Package, roles: ['admin'] },
   { to: '/mesa-central/recetas', label: 'Recetas', icon: ChefHat, roles: ['admin'] },
+  { to: '/mesa-central/proveedores', label: 'Proveedores', icon: Truck, roles: ['admin'] },
+  { to: '/mesa-central/cotizador', label: 'Cotizador', icon: Calculator, roles: ['admin'] },
   { to: '/mesa-central/reportes', label: 'Reportes', icon: BarChart3, roles: ['admin'] },
   { to: '/mesa-central/config', label: 'Configuración', icon: Settings, roles: ['admin'] },
 ]
@@ -54,6 +60,15 @@ const NAV: NavItem[] = [
 export default function Sidebar({ role }: { role: Role }) {
   const navigate = useNavigate()
   const visible = NAV.filter(item => item.roles.includes(role))
+  const [stockAlertas, setStockAlertas] = useState(0)
+
+  useEffect(() => {
+    const fetchAlertas = () =>
+      api.ingredientes.alertas().then(a => setStockAlertas(a.length)).catch(() => {})
+    fetchAlertas()
+    const t = setInterval(fetchAlertas, 60000)
+    return () => clearInterval(t)
+  }, [])
 
   function logout() {
     localStorage.removeItem('inv_token')
@@ -88,7 +103,12 @@ export default function Sidebar({ role }: { role: Role }) {
             }
           >
             <Icon size={17} />
-            {label}
+            <span className="flex-1">{label}</span>
+            {to === '/mesa-central/ingredientes' && stockAlertas > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-0.5">
+                {stockAlertas > 9 ? '9+' : stockAlertas}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

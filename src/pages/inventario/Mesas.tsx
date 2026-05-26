@@ -2,9 +2,11 @@ import { useEffect, useState, useCallback } from 'react'
 import { api } from './api/client'
 import type { Mesa, MesaIn, Comanda, Producto, PagoOut } from './api/client'
 import {
-  Plus, X, Trash2, Settings, Users, ChevronRight, Minus, Clock, FileText,
+  Plus, X, Trash2, Settings, Users, ChevronRight, Minus, Clock, FileText, PenLine,
   CreditCard, Banknote, Smartphone, ArrowLeftRight, Check, Printer, Percent, ShoppingBag,
+  TrendingUp,
 } from 'lucide-react'
+import type { VentasResumen } from './api/client'
 
 function clpFormat(n: number) {
   return `$${n.toLocaleString('es-CL')}`
@@ -121,6 +123,8 @@ function ComandaPanel({
   const [loading, setLoading] = useState(!deliveryComanda)
   const [filterCat, setFilterCat] = useState('')
   const [showCobrar, setShowCobrar] = useState(false)
+  const [notaModal, setNotaModal] = useState<{ prod: Producto; notas: string } | null>(null)
+  const [localAgotado, setLocalAgotado] = useState<Record<number, boolean>>({})
   const [tipoPago, setTipoPago] = useState('efectivo')
   const [montoRecibido, setMontoRecibido] = useState('')
   const [descuentoPct, setDescuentoPct] = useState('')
@@ -145,14 +149,27 @@ function ComandaPanel({
 
   useEffect(() => { load() }, [load])
 
-  async function agregar(prod: Producto) {
-    if (!comanda) return
+  async function confirmarNota() {
+    if (!comanda || !notaModal) return
+    setNotaModal(null)
     try {
-      const updated = await api.comandas.agregarItem(comanda.id, { producto_id: prod.id, cantidad: 1 })
+      const updated = await api.comandas.agregarItem(comanda.id, {
+        producto_id: notaModal.prod.id,
+        cantidad: 1,
+        notas: notaModal.notas,
+      })
       setComanda(updated)
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'Error')
     }
+  }
+
+  async function toggleAgotado(prodId: number, e: React.MouseEvent) {
+    e.stopPropagation()
+    try {
+      const result = await api.productosExtra.agotar(prodId)
+      setLocalAgotado(prev => ({ ...prev, [prodId]: result.agotado_hoy }))
+    } catch { }
   }
 
   async function cambiarCantidad(item_id: number, nueva: number) {
@@ -288,7 +305,7 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
       <div className="flex-1 bg-black/40" onClick={onClose} />
 
       {/* Panel */}
-      <div className="w-full max-w-2xl bg-white flex flex-col shadow-2xl">
+      <div className="w-full max-w-2xl bg-white flex flex-col shadow-2xl relative">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
           <div>
@@ -342,24 +359,37 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-3 grid grid-cols-2 gap-2 content-start">
-              {prodFiltrados.filter(p => p.activo).map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => agregar(p)}
-                  className="text-left bg-stone-50 hover:bg-amber-50 border border-stone-100 hover:border-amber-200 rounded-xl p-3 transition-colors"
-                >
-                  {p.foto && (
-                    <img
-                      src={p.foto}
-                      alt={p.nombre}
-                      className="w-full aspect-video object-cover rounded-lg mb-2"
-                      onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                    />
-                  )}
-                  <p className="text-xs font-semibold text-stone-800 leading-tight">{p.nombre}</p>
-                  <p className="text-amber-600 text-xs font-bold mt-0.5">{clpFormat(p.precio)}</p>
-                </button>
-              ))}
+              {prodFiltrados.filter(p => p.activo).map(p => {
+                const agotado = localAgotado[p.id] ?? p.agotado_hoy
+                return (
+                  <div key={p.id} className="relative">
+                    <button
+                      onClick={() => !agotado && setNotaModal({ prod: p, notas: '' })}
+                      disabled={agotado}
+                      className={`w-full text-left rounded-xl p-3 transition-colors border ${agotado ? 'opacity-40 cursor-not-allowed bg-stone-100 border-stone-200' : 'bg-stone-50 hover:bg-amber-50 border-stone-100 hover:border-amber-200'}`}
+                    >
+                      {p.foto && (
+                        <img
+                          src={p.foto}
+                          alt={p.nombre}
+                          className="w-full aspect-video object-cover rounded-lg mb-2"
+                          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                        />
+                      )}
+                      <p className="text-xs font-semibold text-stone-800 leading-tight">{p.nombre}</p>
+                      <p className="text-amber-600 text-xs font-bold mt-0.5">{clpFormat(p.precio)}</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={e => toggleAgotado(p.id, e)}
+                      title={agotado ? 'Marcar disponible' : 'Marcar agotado'}
+                      className={`absolute top-1.5 right-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${agotado ? 'bg-red-500 text-white' : 'bg-stone-200 text-stone-500 hover:bg-red-100 hover:text-red-500'}`}
+                    >
+                      {agotado ? 'Agotado' : '86'}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </div>
 
@@ -453,6 +483,18 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
                     </div>
                     <div>
                       <label className="text-xs text-stone-400 mb-1 block">Propina $</label>
+                      <div className="flex gap-1 mb-1.5">
+                        {[5, 10, 15].map(pct => (
+                          <button
+                            type="button"
+                            key={pct}
+                            onClick={() => setPropinaVal(String(Math.round(subtotal * pct / 100)))}
+                            className="flex-1 text-[11px] bg-stone-100 hover:bg-amber-100 hover:text-amber-800 rounded-lg py-1 text-stone-600 font-semibold transition-colors"
+                          >
+                            {pct}%
+                          </button>
+                        ))}
+                      </div>
                       <input
                         type="number"
                         min={0}
@@ -518,6 +560,40 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
             </div>
           </div>
         </div>
+
+        {/* Modal de nota por ítem */}
+        {notaModal && (
+          <div className="absolute inset-0 z-20 flex items-end bg-stone-900/75">
+            <div className="w-full bg-white p-4 space-y-3 border-t border-stone-200">
+              <div className="flex items-center gap-2">
+                <PenLine size={15} className="text-amber-500" />
+                <p className="text-sm font-semibold text-stone-800">{notaModal.prod.nombre}</p>
+                <span className="ml-auto text-sm font-bold text-amber-600">{clpFormat(notaModal.prod.precio)}</span>
+              </div>
+              <input
+                autoFocus
+                className="w-full border border-stone-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-400"
+                placeholder="Nota para cocina — ej: sin cebolla, bien cocido… (Enter para agregar)"
+                value={notaModal.notas}
+                onChange={e => setNotaModal(m => m ? { ...m, notas: e.target.value } : m)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') confirmarNota()
+                  if (e.key === 'Escape') setNotaModal(null)
+                }}
+              />
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setNotaModal(null)}
+                  className="flex-1 border border-stone-200 rounded-xl py-2.5 text-sm text-stone-600 hover:bg-stone-50">
+                  Cancelar
+                </button>
+                <button type="button" onClick={confirmarNota}
+                  className="flex-1 bg-amber-500 hover:bg-amber-400 rounded-xl py-2.5 text-sm font-semibold text-stone-900">
+                  Agregar ↵
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -528,6 +604,7 @@ export default function Mesas() {
   const [mesas, setMesas] = useState<Mesa[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
   const [comandasActivas, setComandasActivas] = useState<Comanda[]>([])
+  const [resumenHoy, setResumenHoy] = useState<VentasResumen['hoy'] | null>(null)
   const [loading, setLoading] = useState(true)
   const [showNueva, setShowNueva] = useState(false)
   const [mesaActiva, setMesaActiva] = useState<Mesa | null>(null)
@@ -540,14 +617,16 @@ export default function Mesas() {
   async function reload() {
     setLoading(true)
     try {
-      const [m, p, cas] = await Promise.all([
+      const [m, p, cas, res] = await Promise.all([
         api.mesas.list(),
         api.productos.list(true),
         api.comandas.activos(),
+        api.ventas.resumen().catch(() => null),
       ])
       setMesas(m)
       setProductos(p)
       setComandasActivas(cas)
+      if (res) setResumenHoy(res.hoy)
     } finally {
       setLoading(false)
     }
@@ -615,6 +694,33 @@ export default function Mesas() {
           </button>
         </div>
       </div>
+
+      {/* Resumen del turno */}
+      {resumenHoy && (
+        <div className="flex items-center gap-4 bg-stone-50 border border-stone-100 rounded-2xl px-5 py-3">
+          <TrendingUp size={18} className="text-amber-500 shrink-0" />
+          <div className="flex gap-6 text-sm flex-wrap">
+            <div>
+              <span className="text-stone-400 text-xs">Ventas hoy</span>
+              <p className="font-bold text-stone-800">{clpFormat(resumenHoy.total)}</p>
+            </div>
+            <div>
+              <span className="text-stone-400 text-xs">Cobros</span>
+              <p className="font-bold text-stone-800">{resumenHoy.count}</p>
+            </div>
+            <div>
+              <span className="text-stone-400 text-xs">Mesas activas</span>
+              <p className="font-bold text-stone-800">{comandasActivas.filter(c => c.tipo === 'mesa').length}</p>
+            </div>
+            {resumenHoy.count > 0 && (
+              <div>
+                <span className="text-stone-400 text-xs">Ticket promedio</span>
+                <p className="font-bold text-stone-800">{clpFormat(Math.round(resumenHoy.total / resumenHoy.count))}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Leyenda */}
       <div className="flex gap-4 text-xs text-stone-500">

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { api } from './api/client'
 import type { Comanda } from './api/client'
 import { RefreshCw, Clock, UtensilsCrossed, CheckCircle2 } from 'lucide-react'
@@ -18,15 +18,40 @@ function urgencia(iso: string): string {
   return 'border-stone-600 bg-stone-800'
 }
 
+function playBeep() {
+  try {
+    const ctx = new AudioContext()
+    const notas = [660, 880, 660]
+    notas.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = freq
+      const t = ctx.currentTime + i * 0.18
+      gain.gain.setValueAtTime(0.45, t)
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22)
+      osc.start(t)
+      osc.stop(t + 0.22)
+    })
+  } catch { }
+}
+
 export default function Cocina() {
   const [comandas, setComandas] = useState<Comanda[]>([])
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(new Date())
   const [toggling, setToggling] = useState<number | null>(null)
+  const prevIdsRef = useRef<Set<number>>(new Set())
 
   const reload = useCallback(async () => {
     try {
       const data = await api.comandas.cocina()
+      const newIds = new Set(data.map(c => c.id))
+      if (prevIdsRef.current.size > 0 && data.some(c => !prevIdsRef.current.has(c.id))) {
+        playBeep()
+      }
+      prevIdsRef.current = newIds
       setComandas(data)
       setLastUpdate(new Date())
     } catch {

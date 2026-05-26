@@ -18,6 +18,9 @@ import CierreCaja from './CierreCaja'
 import Merma from './Merma'
 import QRMenu from './QRMenu'
 import Configuracion from './Configuracion'
+import Proveedores from './Proveedores'
+import Cotizador from './Cotizador'
+import Manual from './Manual'
 
 export type Role = 'admin' | 'mozo' | 'cocina'
 
@@ -48,7 +51,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     api.auth
       .me()
       .then(data => {
-        const r = (data.role as Role) || 'mozo'
+        const r = (data.role as Role) || 'admin'
         setRole(r)
         localStorage.setItem('inv_role', r)
         setChecking(false)
@@ -98,7 +101,10 @@ export default function InventarioApp() {
                     <Route path="ingredientes" element={<RoleGuard allow={['admin']}><Ingredientes /></RoleGuard>} />
                     <Route path="recetas" element={<RoleGuard allow={['admin']}><Recetas /></RoleGuard>} />
                     <Route path="reportes" element={<RoleGuard allow={['admin']}><Reportes /></RoleGuard>} />
+                    <Route path="proveedores" element={<RoleGuard allow={['admin']}><Proveedores /></RoleGuard>} />
+                    <Route path="cotizador" element={<RoleGuard allow={['admin']}><Cotizador /></RoleGuard>} />
                     <Route path="config" element={<RoleGuard allow={['admin']}><Configuracion /></RoleGuard>} />
+                    <Route path="manual" element={<Manual />} />
                     <Route path="*" element={<Navigate to="/mesa-central" replace />} />
                   </Routes>
                 </Layout>

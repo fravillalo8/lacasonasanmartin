@@ -155,16 +155,6 @@ function ComandaPanel({
     }
   }
 
-  async function quitar(item_id: number) {
-    if (!comanda) return
-    try {
-      const updated = await api.comandas.quitarItem(comanda.id, item_id)
-      setComanda(updated)
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Error')
-    }
-  }
-
   async function cambiarCantidad(item_id: number, nueva: number) {
     if (!comanda) return
     try {

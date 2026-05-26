@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { api } from './api/client'
-import type { Mesa, MesaIn, Comanda, Producto, PagoOut } from './api/client'
+import type { Mesa, MesaIn, Comanda, Producto, PagoOut, MPDevice } from './api/client'
 import {
   Plus, X, Trash2, Settings, Users, ChevronRight, Minus, Clock, FileText, PenLine,
   CreditCard, Banknote, Smartphone, ArrowLeftRight, Check, Printer, Percent, ShoppingBag,
@@ -105,6 +105,155 @@ function ModalNuevaMesa({
   )
 }
 
+// ─── MP Point: modal de espera ─────────────────────────────────────────────
+function MPPointModal({
+  amount,
+  deviceId,
+  description,
+  onSuccess,
+  onCancel,
+}: {
+  amount: number
+  deviceId: string
+  description: string
+  onSuccess: (tipoPago: string) => void
+  onCancel: () => void
+}) {
+  type Estado = 'enviando' | 'esperando' | 'procesando' | 'aprobado' | 'rechazado' | 'error'
+  const [estado, setEstado] = useState<Estado>('enviando')
+  const [intentId, setIntentId] = useState<string | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    api.mpPoint.crearIntent({ device_id: deviceId, amount: Math.round(amount), description })
+      .then(intent => {
+        setIntentId(intent.id)
+        setEstado('esperando')
+        intervalRef.current = setInterval(async () => {
+          try {
+            const s = await api.mpPoint.verIntent(intent.id)
+            if (s.state === 'ON_TERMINAL') setEstado('esperando')
+            if (s.state === 'PROCESSING') setEstado('procesando')
+            if (s.state === 'FINISHED') {
+              clearInterval(intervalRef.current!)
+              if (s.payment_data?.state === 'CONFIRMED') {
+                setEstado('aprobado')
+                const tipo = s.payment_data?.type === 'debit_card' ? 'debito' : 'credito'
+                setTimeout(() => onSuccess(tipo), 1200)
+              } else {
+                setEstado('rechazado')
+              }
+            }
+            if (s.state === 'CANCELED' || s.state === 'ERROR') {
+              clearInterval(intervalRef.current!)
+              setEstado('error')
+            }
+          } catch { }
+        }, 3000)
+      })
+      .catch(() => setEstado('error'))
+
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
+  }, [])  // eslint-disable-line
+
+  async function cancelar() {
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    if (intentId) api.mpPoint.cancelarIntent(deviceId, intentId).catch(() => {})
+    onCancel()
+  }
+
+  const INFO: Record<Estado, { emoji: string; label: string; spin: boolean }> = {
+    enviando:    { emoji: '📡', label: 'Enviando al terminal…', spin: true },
+    esperando:   { emoji: '📱', label: 'Esperando pago del cliente…', spin: true },
+    procesando:  { emoji: '⏳', label: 'Procesando con el banco…', spin: true },
+    aprobado:    { emoji: '✅', label: '¡Pago aprobado!', spin: false },
+    rechazado:   { emoji: '❌', label: 'Pago rechazado por el banco', spin: false },
+    error:       { emoji: '⚠️', label: 'Error en el terminal', spin: false },
+  }
+  const { emoji, label, spin } = INFO[estado]
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70">
+      <div className="bg-white rounded-3xl p-8 shadow-2xl w-80 text-center space-y-5">
+        <p className="text-5xl">{emoji}</p>
+        <div>
+          <p className="font-bold text-lg text-stone-800">{label}</p>
+          <p className="text-stone-400 text-sm mt-1">Mercado Pago Point</p>
+        </div>
+        <div className="bg-stone-50 rounded-2xl py-4">
+          <p className="text-3xl font-black text-stone-900">{clpFormat(amount)}</p>
+        </div>
+        {spin && (
+          <div className="flex justify-center">
+            <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+        {(estado === 'esperando' || estado === 'procesando' || estado === 'enviando') && (
+          <button type="button" onClick={cancelar}
+            className="w-full border border-stone-200 text-stone-500 py-2.5 rounded-xl text-sm hover:bg-stone-50">
+            Cancelar
+          </button>
+        )}
+        {(estado === 'rechazado' || estado === 'error') && (
+          <button type="button" onClick={onCancel}
+            className="w-full bg-stone-800 text-white py-2.5 rounded-xl text-sm font-semibold">
+            Volver a intentar
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── MP Point: selector de dispositivo ────────────────────────────────────
+function MPDeviceModal({
+  onSelect,
+  onClose,
+}: {
+  onSelect: (device: MPDevice) => void
+  onClose: () => void
+}) {
+  const [devices, setDevices] = useState<MPDevice[]>([])
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    api.mpPoint.devices()
+      .then(r => setDevices(r.devices ?? []))
+      .catch(e => setErr(e instanceof Error ? e.message : 'Error al buscar terminales'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+      <div className="bg-white rounded-2xl shadow-2xl w-80 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
+          <p className="font-semibold text-stone-800">Seleccionar terminal</p>
+          <button onClick={onClose}><X size={16} className="text-stone-400" /></button>
+        </div>
+        <div className="p-4 space-y-2">
+          {loading && <p className="text-sm text-stone-400 text-center py-4">Buscando terminales…</p>}
+          {err && <p className="text-sm text-red-500">{err}</p>}
+          {!loading && devices.length === 0 && !err && (
+            <p className="text-sm text-stone-400 text-center py-4">
+              Sin terminales en modo PDV.<br/>
+              <a href="https://www.mercadopago.cl/point" target="_blank" rel="noreferrer"
+                className="text-sky-500 underline text-xs">Ver configuración</a>
+            </p>
+          )}
+          {devices.map(d => (
+            <button key={d.id} onClick={() => onSelect(d)}
+              className="w-full text-left bg-stone-50 hover:bg-sky-50 border border-stone-100 hover:border-sky-300 rounded-xl px-4 py-3 transition-colors">
+              <p className="text-sm font-semibold text-stone-800">Terminal #{d.pos_id}</p>
+              <p className="text-xs text-stone-400 mt-0.5">{d.id}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── POS: Panel de comanda ─────────────────────────────────────────────────
 function ComandaPanel({
   mesa,
@@ -125,6 +274,12 @@ function ComandaPanel({
   const [showCobrar, setShowCobrar] = useState(false)
   const [notaModal, setNotaModal] = useState<{ prod: Producto; notas: string } | null>(null)
   const [localAgotado, setLocalAgotado] = useState<Record<number, boolean>>({})
+  const [mpDevice, setMpDevice] = useState<MPDevice | null>(() => {
+    const s = localStorage.getItem('mp_device')
+    return s ? JSON.parse(s) : null
+  })
+  const [showMPDevice, setShowMPDevice] = useState(false)
+  const [showMPModal, setShowMPModal] = useState(false)
   const [tipoPago, setTipoPago] = useState('efectivo')
   const [montoRecibido, setMontoRecibido] = useState('')
   const [descuentoPct, setDescuentoPct] = useState('')
@@ -199,13 +354,21 @@ function ComandaPanel({
   const descMonto = Math.round(subtotal * descPct / 100)
   const totalFinal = Math.max(0, subtotal - descMonto + propina)
 
-  async function cobrar() {
+  async function cobrar(tipoOverride?: string) {
     if (!comanda) return
+    const tipo = tipoOverride ?? tipoPago
+
+    if (tipo === 'mp') {
+      if (!mpDevice) { setShowMPDevice(true); return }
+      setShowMPModal(true)
+      return
+    }
+
     setCobrando(true)
     try {
-      const monto = tipoPago === 'efectivo' ? (parseFloat(montoRecibido) || totalFinal) : totalFinal
+      const monto = tipo === 'efectivo' ? (parseFloat(montoRecibido) || totalFinal) : totalFinal
       const result = await api.comandas.cobrar(comanda.id, {
-        tipo_pago: tipoPago,
+        tipo_pago: tipo,
         monto_recibido: monto,
         descuento_pct: descPct,
         propina,
@@ -215,6 +378,18 @@ function ComandaPanel({
       setErr(e instanceof Error ? e.message : 'Error')
       setCobrando(false)
     }
+  }
+
+  function handleMPSuccess(cardType: string) {
+    setShowMPModal(false)
+    cobrar(cardType)
+  }
+
+  function seleccionarDevice(d: MPDevice) {
+    setMpDevice(d)
+    localStorage.setItem('mp_device', JSON.stringify(d))
+    setShowMPDevice(false)
+    setShowMPModal(true)
   }
 
   const panelTitle = deliveryComanda
@@ -265,6 +440,7 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
     debito: <CreditCard size={15} />,
     credito: <CreditCard size={15} />,
     transferencia: <Smartphone size={15} />,
+    mp: <span className="text-sky-500 font-black text-[11px]">MP</span>,
   }
 
   if (pagoResult) {
@@ -513,19 +689,31 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
                     </div>
                   )}
                   {/* Tipo de pago */}
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {(['efectivo', 'debito', 'credito', 'transferencia'] as const).map(t => (
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['efectivo', 'debito', 'credito', 'transferencia', 'mp'] as const).map(t => (
                       <button
                         type="button"
                         key={t}
                         onClick={() => setTipoPago(t)}
-                        className={`flex items-center gap-1.5 justify-center px-2 py-1.5 rounded-lg text-xs font-medium transition-colors border ${tipoPago === t ? 'bg-stone-800 text-white border-stone-800' : 'border-stone-200 text-stone-600 hover:bg-stone-50'}`}
+                        className={`flex items-center gap-1 justify-center px-1.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${tipoPago === t ? 'bg-stone-800 text-white border-stone-800' : 'border-stone-200 text-stone-600 hover:bg-stone-50'}`}
                       >
                         {pagoIcons[t]}
-                        {t.charAt(0).toUpperCase() + t.slice(1)}
+                        {t === 'mp' ? 'Terminal' : t.charAt(0).toUpperCase() + t.slice(1)}
                       </button>
                     ))}
                   </div>
+                  {tipoPago === 'mp' && (
+                    <div className="flex items-center justify-between bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 text-xs">
+                      {mpDevice
+                        ? <span className="text-sky-700">Terminal #{mpDevice.pos_id}</span>
+                        : <span className="text-stone-400">Sin terminal configurado</span>
+                      }
+                      <button type="button" onClick={() => setShowMPDevice(true)}
+                        className="text-sky-600 font-semibold hover:underline">
+                        {mpDevice ? 'Cambiar' : 'Configurar'}
+                      </button>
+                    </div>
+                  )}
                   {tipoPago === 'efectivo' && (
                     <input
                       type="number"
@@ -542,11 +730,17 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
                   )}
                   <button
                     type="button"
-                    onClick={cobrar}
+                    onClick={() => cobrar()}
                     disabled={cobrando}
-                    className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl text-sm transition-colors"
+                    className={`w-full font-bold py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50 ${
+                      tipoPago === 'mp'
+                        ? 'bg-sky-500 hover:bg-sky-400 text-white'
+                        : 'bg-emerald-500 hover:bg-emerald-400 text-white'
+                    }`}
                   >
-                    {cobrando ? 'Procesando…' : `Confirmar ${clpFormat(totalFinal)}`}
+                    {cobrando ? 'Procesando…'
+                      : tipoPago === 'mp' ? `Enviar al terminal ${clpFormat(totalFinal)}`
+                      : `Confirmar ${clpFormat(totalFinal)}`}
                   </button>
                   <button
                     type="button"
@@ -560,6 +754,25 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
             </div>
           </div>
         </div>
+
+        {/* Modal MP Point — esperando pago */}
+        {showMPModal && mpDevice && (
+          <MPPointModal
+            amount={totalFinal}
+            deviceId={mpDevice.id}
+            description={panelTitle}
+            onSuccess={handleMPSuccess}
+            onCancel={() => setShowMPModal(false)}
+          />
+        )}
+
+        {/* Modal MP Point — selector de terminal */}
+        {showMPDevice && (
+          <MPDeviceModal
+            onSelect={seleccionarDevice}
+            onClose={() => setShowMPDevice(false)}
+          />
+        )}
 
         {/* Modal de nota por ítem */}
         {notaModal && (

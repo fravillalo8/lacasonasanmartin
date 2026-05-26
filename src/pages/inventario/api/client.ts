@@ -262,6 +262,16 @@ export const api = {
       request<{ ok: boolean }>(`/proveedores/${provId}/precios/${precioId}`, { method: 'DELETE' }),
   },
 
+  // ─── MP Point ────────────────────────────────────────────────────────────
+  mpPoint: {
+    devices: () => request<{ devices: MPDevice[] }>('/mp-point/devices'),
+    crearIntent: (data: { device_id: string; amount: number; description?: string }) =>
+      request<MPIntent>('/mp-point/intents', { method: 'POST', body: JSON.stringify(data) }),
+    verIntent: (intent_id: string) => request<MPIntent>(`/mp-point/intents/${intent_id}`),
+    cancelarIntent: (device_id: string, intent_id: string) =>
+      request<{ ok: boolean }>(`/mp-point/intents/${device_id}/${intent_id}`, { method: 'DELETE' }),
+  },
+
   // ─── Cotizador ────────────────────────────────────────────────────────────
   cotizador: {
     comparar: () => request<ComparacionData>('/cotizador/comparar'),
@@ -794,4 +804,24 @@ export interface PrediccionCompras {
   dias_objetivo: number
   ingredientes: PrediccionIngrediente[]
   resumen: { criticos: number; altos: number; con_datos: number }
+}
+
+export interface MPDevice {
+  id: string
+  pos_id: number
+  store_id: string
+  operating_mode: string
+}
+
+export interface MPIntent {
+  id: string
+  device_id: string
+  amount: number
+  state: 'OPEN' | 'ON_TERMINAL' | 'PROCESSING' | 'FINISHED' | 'CANCELED' | 'ERROR'
+  payment_data?: {
+    state: 'CONFIRMED' | 'REJECTED'
+    payment_id?: number
+    type?: string        // debit_card | credit_card
+    installments?: number
+  }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { WifiOff, RefreshCw, Check } from 'lucide-react'
+import { WifiOff, RefreshCw, Check, AlertTriangle, X } from 'lucide-react'
 import { useOnlineStatus } from '../../../hooks/useOnlineStatus'
 import { offlineQ, syncQueue } from '../api/client'
 
@@ -8,8 +8,10 @@ export default function OfflineBanner() {
   const [pending, setPending] = useState(() => offlineQ.count())
   const [syncing, setSyncing] = useState(false)
   const [justSynced, setJustSynced] = useState(false)
+  const [failedCount, setFailedCount] = useState(0)
+  const [showConflicts, setShowConflicts] = useState(false)
 
-  // Recount queue on every render cycle + when going online
+  // Recount queue on every render cycle
   useEffect(() => {
     const tick = setInterval(() => setPending(offlineQ.count()), 1000)
     return () => clearInterval(tick)
@@ -18,15 +20,40 @@ export default function OfflineBanner() {
   useEffect(() => {
     if (!online || offlineQ.count() === 0) return
     setSyncing(true)
-    syncQueue().then(({ synced }) => {
+    syncQueue().then(({ synced, failed }) => {
       setPending(offlineQ.count())
       setSyncing(false)
+      if (failed > 0) {
+        setFailedCount(failed)
+        setShowConflicts(true)
+      }
       if (synced > 0) {
         setJustSynced(true)
         setTimeout(() => setJustSynced(false), 3000)
       }
     })
   }, [online])
+
+  // Conflictos fallidos — banner dismissible
+  if (showConflicts && failedCount > 0) {
+    return (
+      <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-xs flex items-center justify-center gap-2 py-1.5 px-4 shadow-lg">
+        <AlertTriangle size={13} className="shrink-0" />
+        <span className="font-semibold">
+          {failedCount} operación{failedCount > 1 ? 'es' : ''} offline no se pudo{failedCount > 1 ? 'ron' : ''} sincronizar
+          {' '}(cambios en conflicto — la versión del servidor prevalece)
+        </span>
+        <button
+          type="button"
+          onClick={() => { setShowConflicts(false); setFailedCount(0) }}
+          className="ml-2 hover:opacity-80"
+          aria-label="Cerrar aviso de conflictos"
+        >
+          <X size={13} />
+        </button>
+      </div>
+    )
+  }
 
   // Nada que mostrar: online y sin pendientes (y no recién sincronizado)
   if (online && pending === 0 && !syncing && !justSynced) return null
@@ -63,7 +90,6 @@ export default function OfflineBanner() {
     )
   }
 
-  // Online con pendientes pero sin sincronizar aún
   if (pending > 0) {
     return (
       <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-500 text-stone-900 text-xs flex items-center justify-center gap-2 py-1.5 px-4 shadow-lg">

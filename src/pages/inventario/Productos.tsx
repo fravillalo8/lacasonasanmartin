@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from './api/client'
 import type { Producto, ProductoIn } from './api/client'
-import { Plus, Pencil, Trash2, Upload, X, Check, ImageOff } from 'lucide-react'
+import { Plus, Pencil, Trash2, Upload, X, Check, ImageOff, Camera, Link as LinkIcon } from 'lucide-react'
 
 const CATEGORIAS = ['Entradas', 'Platos principales', 'Postres', 'Bebidas', 'Vinos', 'Tragos', 'Sin categoría']
 
@@ -52,6 +52,21 @@ function FormProducto({
   })
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  const [fotoModo, setFotoModo] = useState<'url' | 'archivo'>('url')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleFotoFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 512_000) { setErr('Imagen muy grande (máx 512 KB)'); return }
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const dataUrl = ev.target?.result as string
+      setForm(f => ({ ...f, foto: dataUrl }))
+      setErr('')
+    }
+    reader.readAsDataURL(file)
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -111,14 +126,64 @@ function FormProducto({
         />
       </div>
       <div>
-        <label className="text-xs text-stone-500 mb-1 block">URL de foto</label>
-        <input
-          type="url"
-          placeholder="https://…"
-          className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-400"
-          value={form.foto}
-          onChange={e => setForm(f => ({ ...f, foto: e.target.value }))}
-        />
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-stone-500">Foto</label>
+          <div className="flex gap-1">
+            <button type="button" onClick={() => setFotoModo('url')}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${fotoModo === 'url' ? 'bg-amber-500 text-stone-900' : 'bg-stone-100 text-stone-500'}`}>
+              <LinkIcon size={9} /> URL
+            </button>
+            <button type="button" onClick={() => setFotoModo('archivo')}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${fotoModo === 'archivo' ? 'bg-amber-500 text-stone-900' : 'bg-stone-100 text-stone-500'}`}>
+              <Camera size={9} /> Archivo
+            </button>
+          </div>
+        </div>
+        {fotoModo === 'url' ? (
+          <input
+            type="url"
+            placeholder="https://…"
+            className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-400"
+            value={form.foto?.startsWith('data:') ? '' : (form.foto ?? '')}
+            onChange={e => setForm(f => ({ ...f, foto: e.target.value }))}
+          />
+        ) : (
+          <div className="space-y-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              aria-label="Seleccionar imagen para el producto"
+              className="hidden"
+              onChange={handleFotoFile}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full border-2 border-dashed border-stone-200 rounded-lg py-3 text-sm text-stone-400 hover:border-amber-400 hover:text-amber-600 transition-colors flex items-center justify-center gap-2"
+            >
+              <Camera size={15} />
+              {form.foto?.startsWith('data:') ? 'Cambiar imagen' : 'Seleccionar imagen (máx 512 KB)'}
+            </button>
+          </div>
+        )}
+        {form.foto && (
+          <div className="mt-2 flex items-center gap-2">
+            <img
+              src={form.foto}
+              alt="preview"
+              className="w-16 h-12 object-cover rounded-lg border border-stone-200"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+            <button
+              type="button"
+              onClick={() => setForm(f => ({ ...f, foto: '' }))}
+              className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1"
+            >
+              <X size={11} /> Quitar foto
+            </button>
+          </div>
+        )}
       </div>
       {err && <p className="text-red-500 text-xs">{err}</p>}
       <div className="flex gap-2 pt-1">

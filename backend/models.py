@@ -125,6 +125,8 @@ class Mesa(Base):
     nombre = Column(String(100), default="")
     capacidad = Column(Integer, default=4)
     estado = Column(String(20), default="libre")  # libre, ocupada, cuenta
+    posicion_x = Column(Integer, default=0)       # columna en el mapa de planta (0 = sin posicionar)
+    posicion_y = Column(Integer, default=0)       # fila en el mapa de planta
     created_at = Column(DateTime, default=datetime.utcnow)
 
     comandas = relationship("Comanda", back_populates="mesa")
@@ -178,6 +180,8 @@ class Venta(Base):
     monto_recibido = Column(Float, default=0)
     vuelto = Column(Float, default=0)
     numero_mesa = Column(Integer, default=0)
+    pago2_tipo = Column(String(20), default="")   # segundo método de pago (split)
+    pago2_monto = Column(Float, default=0)         # monto del segundo método
     created_at = Column(DateTime, default=datetime.utcnow)
 
     comanda = relationship("Comanda", back_populates="venta")

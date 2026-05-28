@@ -210,12 +210,16 @@ export const api = {
       request<HorariosPico>(`/reportes/horarios-pico${dias ? `?dias=${dias}` : ''}`),
     pyl: (meses?: number) =>
       request<PYLMes[]>(`/reportes/pyl${meses ? `?meses=${meses}` : ''}`),
+    estadisticasRoles: (dias?: number) =>
+      request<EstadisticasRoles>(`/reportes/estadisticas-roles${dias ? `?dias=${dias}` : ''}`),
   },
 
   // ─── Productos extra ──────────────────────────────────────────────────────
   productosExtra: {
     agotar: (id: number) =>
       request<{ id: number; agotado_hoy: boolean }>(`/productos/${id}/agotar`, { method: 'POST' }),
+    subirFoto: (id: number, dataUrl: string) =>
+      request<Producto>(`/productos/${id}/foto`, { method: 'POST', body: JSON.stringify({ data_url: dataUrl }) }),
   },
 
   // ─── Productos ───────────────────────────────────────────────────────────
@@ -253,6 +257,10 @@ export const api = {
       request<Mesa>(`/mesas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: number) =>
       request<{ ok: boolean }>(`/mesas/${id}`, { method: 'DELETE' }),
+    moverPosicion: (id: number, posicion_x: number, posicion_y: number) =>
+      request<Mesa>(`/mesas/${id}/posicion`, { method: 'PATCH', body: JSON.stringify({ posicion_x, posicion_y }) }),
+    historial: (id: number, limit = 10) =>
+      request<HistorialComanda[]>(`/mesas/${id}/historial?limit=${limit}`),
   },
 
   // ─── Comandas ────────────────────────────────────────────────────────────
@@ -543,6 +551,9 @@ export interface DashboardData {
   num_ventas_hoy: number
   ventas_mes: number
   num_ventas_mes: number
+  ticket_promedio_hoy: number
+  ventas_7d: number
+  ventas_7d_prev: number
   top_hoy: { nombre: string; cantidad: number }[]
   ultimas_compras: {
     id: number
@@ -569,6 +580,8 @@ export interface PagoIn {
   descuento_pct?: number
   descuento_monto?: number
   propina?: number
+  pago2_tipo?: string
+  pago2_monto?: number
 }
 
 export interface PagoOut {
@@ -578,6 +591,8 @@ export interface PagoOut {
   propina: number
   total: number
   vuelto: number
+  pago2_tipo?: string
+  pago2_monto?: number
 }
 
 export interface VentaDetalle {
@@ -661,6 +676,8 @@ export interface Mesa {
   nombre: string
   capacidad: number
   estado: 'libre' | 'ocupada' | 'cuenta'
+  posicion_x: number
+  posicion_y: number
   comanda_abierta_id: number | null
 }
 
@@ -668,6 +685,24 @@ export interface MesaIn {
   numero: number
   nombre?: string
   capacidad?: number
+  posicion_x?: number
+  posicion_y?: number
+}
+
+export interface HistorialComanda {
+  id: number
+  numero_ticket: number | null
+  estado: string
+  total: number
+  tipo_pago: string
+  pago2_tipo: string
+  pago2_monto: number
+  descuento: number
+  propina: number
+  total_cobrado: number
+  created_at: string
+  closed_at: string
+  items: { nombre: string; cantidad: number; subtotal: number; notas: string }[]
 }
 
 export interface ItemComanda {
@@ -943,4 +978,15 @@ export interface MPIntent {
     type?: string        // debit_card | credit_card
     installments?: number
   }
+}
+
+export interface EstadisticasRoles {
+  dias: number
+  total_ventas_periodo: number
+  roles: {
+    rol: string
+    cobros: number
+    items_agregados: number
+    total_acciones: number
+  }[]
 }

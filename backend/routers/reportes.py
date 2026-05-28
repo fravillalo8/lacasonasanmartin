@@ -4,7 +4,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
-from models import Ingrediente, Compra, MovimientoStock, Receta, ItemReceta, Venta, ItemComanda, Producto, GastoDia, Merma, Comanda
+from models import Ingrediente, Compra, MovimientoStock, Receta, ItemReceta, Venta, ItemComanda, Producto, GastoDia, Merma, Comanda, AuditLog
 from routers.auth import require_auth, require_admin
 import csv
 import io
@@ -56,6 +56,20 @@ def dashboard(db: Session = Depends(get_db), _=Depends(require_auth)):
     ventas_mes = db.query(func.sum(Venta.total)).filter(Venta.created_at >= inicio_mes).scalar() or 0
     num_ventas_mes = db.query(Venta).filter(Venta.created_at >= inicio_mes).count()
 
+    # Ticket promedio del día
+    ticket_promedio_hoy = round(ventas_hoy / num_ventas_hoy, 0) if num_ventas_hoy > 0 else 0
+
+    # Ventas últimos 7 días vs 7 días anteriores (comparativa)
+    inicio_7d = hoy - timedelta(days=7)
+    inicio_7d_prev = hoy - timedelta(days=14)
+    ventas_7d = db.query(func.sum(Venta.total)).filter(
+        Venta.created_at >= inicio_7d
+    ).scalar() or 0
+    ventas_7d_prev = db.query(func.sum(Venta.total)).filter(
+        Venta.created_at >= inicio_7d_prev,
+        Venta.created_at < inicio_7d,
+    ).scalar() or 0
+
     # Top 3 productos del día (comandas cerradas hoy)
     top_hoy = (
         db.query(
@@ -90,6 +104,9 @@ def dashboard(db: Session = Depends(get_db), _=Depends(require_auth)):
         "num_ventas_hoy": num_ventas_hoy,
         "ventas_mes": round(ventas_mes, 0),
         "num_ventas_mes": num_ventas_mes,
+        "ticket_promedio_hoy": ticket_promedio_hoy,
+        "ventas_7d": round(ventas_7d, 0),
+        "ventas_7d_prev": round(ventas_7d_prev, 0),
         "top_hoy": top_hoy_data,
         "ultimas_compras": [
             {
@@ -306,6 +323,67 @@ def pyl_mensual(
             "resultado": round(ingresos - egresos, 0),
         })
     return resultado
+
+
+@router.get("/estadisticas-roles")
+def estadisticas_roles(
+    dias: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    """Resumen de actividad y ventas agrupado por rol (admin/mozo/cocina)."""
+    desde = datetime.utcnow() - timedelta(days=dias)
+
+    # Ventas por rol (usando AuditLog accion=cobrar_mesa)
+    logs_cobros = (
+        db.query(AuditLog.usuario_rol, func.count(AuditLog.id).label("cobros"))
+        .filter(AuditLog.created_at >= desde, AuditLog.accion == "cobrar_mesa")
+        .group_by(AuditLog.usuario_rol)
+        .all()
+    )
+    cobros_por_rol = {r.usuario_rol: r.cobros for r in logs_cobros}
+
+    # Ítems agregados por rol
+    logs_items = (
+        db.query(AuditLog.usuario_rol, func.count(AuditLog.id).label("items"))
+        .filter(AuditLog.created_at >= desde, AuditLog.accion == "agregar_item")
+        .group_by(AuditLog.usuario_rol)
+        .all()
+    )
+    items_por_rol = {r.usuario_rol: r.items for r in logs_items}
+
+    # Total de todas las acciones por rol
+    logs_total = (
+        db.query(AuditLog.usuario_rol, func.count(AuditLog.id).label("total"))
+        .filter(AuditLog.created_at >= desde)
+        .group_by(AuditLog.usuario_rol)
+        .all()
+    )
+    total_por_rol = {r.usuario_rol: r.total for r in logs_total}
+
+    # Ventas totales del período para el promedio
+    ventas_periodo = db.query(Venta).filter(Venta.created_at >= desde).all()
+    total_ventas_periodo = sum(v.total for v in ventas_periodo)
+
+    roles = list(set(list(cobros_por_rol.keys()) + list(items_por_rol.keys()) + list(total_por_rol.keys())))
+    if not roles:
+        roles = ["admin", "mozo", "cocina"]
+
+    resultado = []
+    for rol in sorted(roles):
+        cobros = cobros_por_rol.get(rol, 0)
+        resultado.append({
+            "rol": rol,
+            "cobros": cobros,
+            "items_agregados": items_por_rol.get(rol, 0),
+            "total_acciones": total_por_rol.get(rol, 0),
+        })
+
+    return {
+        "dias": dias,
+        "total_ventas_periodo": round(total_ventas_periodo, 0),
+        "roles": resultado,
+    }
 
 
 # ─── CSV Exports ─────────────────────────────────────────────────────────────

@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { api, OfflineEnqueuedError, syncQueue } from './api/client'
-import type { Mesa, MesaIn, Comanda, ItemComanda, Producto, PagoOut, MPDevice } from './api/client'
+import type { Mesa, MesaIn, Comanda, ItemComanda, Producto, PagoOut, MPDevice, HistorialComanda } from './api/client'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useSSE } from '../../hooks/useSSE'
 import {
   Plus, X, Trash2, Settings, Users, ChevronRight, Minus, Clock, FileText, PenLine,
   CreditCard, Banknote, Smartphone, ArrowLeftRight, Check, Printer, Percent, ShoppingBag,
-  TrendingUp, Bell,
+  TrendingUp, Bell, History, LayoutGrid, Map, SplitSquareVertical, Scissors, AlertCircle,
 } from 'lucide-react'
 import type { VentasResumen } from './api/client'
 
@@ -276,6 +276,194 @@ function MPDeviceModal({
   )
 }
 
+// ─── Historial de mesa ────────────────────────────────────────────────────
+function HistorialModal({ mesa, onClose }: { mesa: Mesa; onClose: () => void }) {
+  const [hist, setHist] = useState<HistorialComanda[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    api.mesas.historial(mesa.id, 10)
+      .then(setHist)
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [mesa.id])
+
+  const PAGO_LABEL: Record<string, string> = {
+    efectivo: 'Efectivo', debito: 'Débito', credito: 'Crédito',
+    transferencia: 'Transf.', mp: 'MP Point', '': '—',
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
+          <div className="flex items-center gap-2">
+            <History size={17} className="text-violet-500" />
+            <h3 className="font-semibold text-stone-800">Historial — Mesa {mesa.numero}</h3>
+          </div>
+          <button type="button" onClick={onClose}><X size={17} className="text-stone-400" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <p className="text-stone-400 text-sm text-center py-8">Cargando…</p>
+          ) : hist.length === 0 ? (
+            <p className="text-stone-400 text-sm text-center py-8">Sin comandas cerradas aún.</p>
+          ) : (
+            <div className="divide-y divide-stone-50">
+              {hist.map(h => (
+                <details key={h.id} className="group">
+                  <summary className="flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-stone-50 list-none">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {h.numero_ticket && (
+                          <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                            #{h.numero_ticket}
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${h.estado === 'cerrada' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                          {h.estado}
+                        </span>
+                        <span className="text-xs text-stone-400">{h.closed_at}</span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <span className="text-sm font-bold text-stone-800">{clpFormat(h.total_cobrado || h.total)}</span>
+                        <span className="text-xs text-stone-400">
+                          {PAGO_LABEL[h.tipo_pago] ?? h.tipo_pago}
+                          {h.pago2_tipo && ` + ${PAGO_LABEL[h.pago2_tipo] ?? h.pago2_tipo} ${clpFormat(h.pago2_monto)}`}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className="text-stone-300 group-open:rotate-90 transition-transform" />
+                  </summary>
+                  <div className="px-5 pb-3 space-y-1">
+                    {h.items.map((it, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs text-stone-500">
+                        <span>{it.cantidad}× {it.nombre}{it.notas ? <em className="text-stone-400"> — {it.notas}</em> : ''}</span>
+                        <span>{clpFormat(it.subtotal)}</span>
+                      </div>
+                    ))}
+                    {(h.descuento > 0 || h.propina > 0) && (
+                      <div className="border-t border-stone-100 mt-1 pt-1 space-y-0.5">
+                        {h.descuento > 0 && <div className="flex justify-between text-xs text-emerald-600"><span>Descuento</span><span>-{clpFormat(h.descuento)}</span></div>}
+                        {h.propina > 0 && <div className="flex justify-between text-xs text-amber-600"><span>Propina</span><span>+{clpFormat(h.propina)}</span></div>}
+                      </div>
+                    )}
+                  </div>
+                </details>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Mapa de planta ───────────────────────────────────────────────────────
+const GRID_COLS = 8
+const GRID_ROWS = 5
+
+function PlantaView({
+  mesas,
+  comandaByMesa,
+  onMesaClick,
+  onMover,
+}: {
+  mesas: Mesa[]
+  comandaByMesa: Record<number, Comanda>
+  onMesaClick: (m: Mesa) => void
+  onMover: (mesaId: number, x: number, y: number) => void
+}) {
+  const [draggingId, setDraggingId] = useState<number | null>(null)
+
+  function handleDragOver(e: React.DragEvent, col: number, row: number) {
+    e.preventDefault()
+  }
+
+  function handleDrop(e: React.DragEvent, col: number, row: number) {
+    e.preventDefault()
+    if (draggingId !== null) {
+      onMover(draggingId, col, row)
+      setDraggingId(null)
+    }
+  }
+
+  const posicionadas = mesas.filter(m => m.posicion_x > 0 || m.posicion_y > 0)
+  const sinPosicion = mesas.filter(m => m.posicion_x === 0 && m.posicion_y === 0)
+  const mesasByPos: Record<string, Mesa> = {}
+  for (const m of posicionadas) {
+    mesasByPos[`${m.posicion_x},${m.posicion_y}`] = m
+  }
+
+  return (
+    <div className="space-y-4">
+      {sinPosicion.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <p className="text-xs font-semibold text-amber-700 mb-2">Sin posicionar — arrastrar al plano</p>
+          <div className="flex gap-2 flex-wrap">
+            {sinPosicion.map(m => (
+              <div
+                key={m.id}
+                draggable
+                onDragStart={() => setDraggingId(m.id)}
+                className="bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-sm font-bold text-stone-700 cursor-grab active:opacity-60 select-none"
+              >
+                {m.numero}{m.nombre ? ` · ${m.nombre}` : ''}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Grid del plano */}
+      <div
+        className="bg-stone-50 border-2 border-dashed border-stone-200 rounded-2xl p-2"
+        style={{ display: 'grid', gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`, gap: '6px', minHeight: '280px' }}
+      >
+        {Array.from({ length: GRID_ROWS }, (_, row) =>
+          Array.from({ length: GRID_COLS }, (_, col) => {
+            const key = `${col + 1},${row + 1}`
+            const mesa = mesasByPos[key]
+            const comanda = mesa ? comandaByMesa[mesa.id] : undefined
+            const listaServir = comanda?.lista_para_servir ?? false
+            const minutosAbierta = comanda ? Math.floor((Date.now() - new Date(comanda.created_at + 'Z').getTime()) / 60000) : 0
+
+            return (
+              <div
+                key={key}
+                onDragOver={e => handleDragOver(e, col + 1, row + 1)}
+                onDrop={e => handleDrop(e, col + 1, row + 1)}
+                className="aspect-square rounded-xl flex items-center justify-center"
+              >
+                {mesa ? (
+                  <div
+                    draggable
+                    onDragStart={() => setDraggingId(mesa.id)}
+                    onClick={() => onMesaClick(mesa)}
+                    className={`w-full h-full rounded-xl border-2 flex flex-col items-center justify-center cursor-pointer select-none text-center transition-all hover:shadow-md ${
+                      listaServir ? 'border-emerald-500 bg-emerald-50' :
+                      minutosAbierta >= 60 ? 'border-red-400 bg-red-50' :
+                      minutosAbierta >= 30 ? 'border-orange-400 bg-orange-50' :
+                      ESTADO_COLOR[mesa.estado]
+                    }`}
+                  >
+                    <span className="font-bold text-lg leading-none">{mesa.numero}</span>
+                    {comanda && <span className="text-[10px] opacity-70 mt-0.5">{minutos(comanda.created_at)}</span>}
+                    {mesa.estado === 'libre' && <span className="text-[9px] opacity-50 mt-0.5">libre</span>}
+                  </div>
+                ) : (
+                  <div className="w-full h-full rounded-xl border border-dashed border-stone-200 bg-white/30" />
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
+      <p className="text-xs text-stone-400 text-center">Arrastra mesas para cambiar su posición en el plano</p>
+    </div>
+  )
+}
+
 // ─── POS: Panel de comanda ─────────────────────────────────────────────────
 function ComandaPanel({
   mesa,
@@ -306,6 +494,10 @@ function ComandaPanel({
   const [montoRecibido, setMontoRecibido] = useState('')
   const [descuentoPct, setDescuentoPct] = useState('')
   const [propinaVal, setPropinaVal] = useState('')
+  const [pago2Tipo, setPago2Tipo] = useState('')
+  const [pago2Monto, setPago2Monto] = useState('')
+  const [showPagoMixto, setShowPagoMixto] = useState(false)
+  const [divN, setDivN] = useState(0)
   const [cobrando, setCobrando] = useState(false)
   const [pagoResult, setPagoResult] = useState<PagoOut | null>(null)
   const [err, setErr] = useState('')
@@ -416,11 +608,15 @@ function ComandaPanel({
     setCobrando(true)
     try {
       const monto = tipo === 'efectivo' ? (parseFloat(montoRecibido) || totalFinal) : totalFinal
+      const p2tipo = showPagoMixto ? pago2Tipo : ''
+      const p2monto = showPagoMixto ? (parseFloat(pago2Monto) || 0) : 0
       const result = await api.comandas.cobrar(comanda.id, {
         tipo_pago: tipo,
         monto_recibido: monto,
         descuento_pct: descPct,
         propina,
+        pago2_tipo: p2tipo,
+        pago2_monto: p2monto,
       })
       setPagoResult(result)
     } catch (e: unknown) {
@@ -472,7 +668,8 @@ ${comanda.items.map(it =>
 ${pagoResult.descuento > 0 ? `<div class="row"><span>Descuento (${descPct}%)</span><span>-${pagoResult.descuento.toLocaleString('es-CL')}</span></div>` : ''}
 ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoResult.propina.toLocaleString('es-CL')}</span></div>` : ''}
 <div class="row total"><span>TOTAL</span><span>$${pagoResult.total.toLocaleString('es-CL')}</span></div>
-<div class="row"><span>Pago: ${tipoPago}</span>${tipoPago === 'efectivo' ? `<span>Vuelto: $${pagoResult.vuelto.toLocaleString('es-CL')}</span>` : ''}</div>
+<div class="row"><span>Pago 1: ${tipoPago}</span>${tipoPago === 'efectivo' ? `<span>Vuelto: $${pagoResult.vuelto.toLocaleString('es-CL')}</span>` : ''}</div>
+${(pagoResult.pago2_tipo) ? `<div class="row"><span>Pago 2: ${pagoResult.pago2_tipo}</span><span>$${(pagoResult.pago2_monto ?? 0).toLocaleString('es-CL')}</span></div>` : ''}
 <div class="divider"></div>
 <p class="center">¡Gracias por su visita!</p>
 <br><button onclick="window.print()">Imprimir</button>
@@ -542,6 +739,9 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
             {pagoResult.propina > 0 && <div className="flex justify-between text-amber-600"><span>Propina</span><span>+{clpFormat(pagoResult.propina)}</span></div>}
             {tipoPago === 'efectivo' && pagoResult.vuelto > 0 && (
               <div className="flex justify-between font-semibold text-blue-600"><span>Vuelto</span><span>{clpFormat(pagoResult.vuelto)}</span></div>
+            )}
+            {pagoResult.pago2_tipo && (
+              <div className="flex justify-between text-stone-600"><span>Pago 2: {pagoResult.pago2_tipo}</span><span>{clpFormat(pagoResult.pago2_monto ?? 0)}</span></div>
             )}
           </div>
           <div className="flex gap-2">
@@ -784,6 +984,81 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
                       </button>
                     ))}
                   </div>
+
+                  {/* Pago mixto */}
+                  <button
+                    type="button"
+                    onClick={() => { setShowPagoMixto(v => !v); setPago2Tipo(''); setPago2Monto('') }}
+                    className={`w-full flex items-center gap-2 justify-center py-1.5 rounded-lg text-xs font-medium transition-colors border ${showPagoMixto ? 'bg-violet-100 border-violet-300 text-violet-700' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
+                  >
+                    <SplitSquareVertical size={12} />
+                    {showPagoMixto ? 'Quitar pago mixto' : 'Pago mixto (2 métodos)'}
+                  </button>
+                  {showPagoMixto && (
+                    <div className="space-y-1.5 bg-violet-50 border border-violet-200 rounded-xl p-2">
+                      <p className="text-[10px] font-semibold text-violet-700 uppercase tracking-wide">Segundo método</p>
+                      <div className="grid grid-cols-3 gap-1">
+                        {(['efectivo', 'debito', 'credito', 'transferencia'] as const).filter(t => t !== tipoPago).map(t => (
+                          <button
+                            type="button"
+                            key={t}
+                            onClick={() => setPago2Tipo(t)}
+                            className={`flex items-center gap-1 justify-center px-1.5 py-1.5 rounded-lg text-xs font-medium transition-colors border ${pago2Tipo === t ? 'bg-violet-600 text-white border-violet-600' : 'border-stone-200 text-stone-600 bg-white hover:bg-violet-50'}`}
+                          >
+                            {pagoIcons[t as keyof typeof pagoIcons]}
+                            {t.charAt(0).toUpperCase() + t.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                      {pago2Tipo && (
+                        <input
+                          type="number"
+                          placeholder={`Monto en ${pago2Tipo}…`}
+                          className="w-full border border-violet-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                          value={pago2Monto}
+                          onChange={e => setPago2Monto(e.target.value)}
+                        />
+                      )}
+                      {pago2Tipo && pago2Monto && (
+                        <p className="text-xs text-violet-700">
+                          Resto en {tipoPago}: <strong>{clpFormat(Math.max(0, totalFinal - (parseFloat(pago2Monto) || 0)))}</strong>
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* División de cuenta */}
+                  <div className="border-t border-stone-100 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setDivN(v => v === 0 ? 2 : 0)}
+                      className={`w-full flex items-center gap-2 justify-center py-1.5 rounded-lg text-xs font-medium transition-colors border ${divN > 0 ? 'bg-amber-100 border-amber-300 text-amber-700' : 'border-stone-200 text-stone-500 hover:bg-stone-50'}`}
+                    >
+                      <Scissors size={12} />
+                      {divN > 0 ? `Dividir en ${divN} personas` : 'Dividir cuenta'}
+                    </button>
+                    {divN > 0 && (
+                      <div className="mt-1.5 space-y-1">
+                        <div className="flex gap-1 justify-center">
+                          {[2, 3, 4, 5, 6].map(n => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setDivN(n)}
+                              className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors ${divN === n ? 'bg-amber-500 text-stone-900' : 'bg-stone-100 text-stone-600 hover:bg-amber-100'}`}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-2 text-center">
+                          <p className="text-xs text-stone-500">Cada persona paga</p>
+                          <p className="text-xl font-black text-amber-700">{clpFormat(Math.ceil(totalFinal / divN))}</p>
+                          <p className="text-[10px] text-stone-400">de {clpFormat(totalFinal)} total</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   {tipoPago === 'mp' && (
                     <div className="flex items-center justify-between bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 text-xs">
                       {mpDevice
@@ -903,6 +1178,8 @@ export default function Mesas() {
   const [loading, setLoading] = useState(true)
   const [showNueva, setShowNueva] = useState(false)
   const [mesaActiva, setMesaActiva] = useState<Mesa | null>(null)
+  const [mesaHistorial, setMesaHistorial] = useState<Mesa | null>(null)
+  const [vistaPlanta, setVistaPlanta] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [showDelivery, setShowDelivery] = useState(false)
   const [deliveryNombre, setDeliveryNombre] = useState('')
@@ -1043,9 +1320,17 @@ export default function Mesas() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-stone-800">Mesas y comandas</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setVistaPlanta(v => !v)}
+            className={`flex items-center gap-2 border font-medium px-3 py-2 rounded-lg text-sm transition-colors ${vistaPlanta ? 'bg-violet-100 border-violet-300 text-violet-700' : 'border-stone-200 text-stone-600 hover:bg-stone-50'}`}
+          >
+            {vistaPlanta ? <LayoutGrid size={15} /> : <Map size={15} />}
+            {vistaPlanta ? 'Vista cuadrícula' : 'Mapa de planta'}
+          </button>
           <button
             type="button"
             onClick={() => setShowDelivery(true)}
@@ -1106,29 +1391,62 @@ export default function Mesas() {
           <p className="text-lg font-medium">Sin mesas configuradas</p>
           <p className="text-sm mt-1">Agrega tu primera mesa para comenzar.</p>
         </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {(() => {
-            const comandaByMesa: Record<number, Comanda> = {}
-            for (const c of comandasActivas) {
-              if (c.mesa_id !== null) comandaByMesa[c.mesa_id] = c
-            }
-            return mesas.map(m => {
+      ) : (() => {
+        const comandaByMesa: Record<number, Comanda> = {}
+        for (const c of comandasActivas) {
+          if (c.mesa_id !== null) comandaByMesa[c.mesa_id] = c
+        }
+
+        if (vistaPlanta) {
+          return (
+            <PlantaView
+              mesas={mesas}
+              comandaByMesa={comandaByMesa}
+              onMesaClick={m => setMesaActiva(m)}
+              onMover={(id, x, y) => {
+                api.mesas.moverPosicion(id, x, y)
+                  .then(updated => setMesas(prev => prev.map(m => m.id === id ? updated : m)))
+                  .catch(() => {})
+              }}
+            />
+          )
+        }
+
+        return (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {mesas.map(m => {
               const comanda = comandaByMesa[m.id]
               const listaServir = comanda?.lista_para_servir ?? false
+              const minAbierta = comanda
+                ? Math.floor((Date.now() - new Date(comanda.created_at + 'Z').getTime()) / 60000)
+                : 0
+              const demorada = minAbierta >= 60
+              const semidemorada = minAbierta >= 30 && !demorada
+
+              let cardClass = ESTADO_COLOR[m.estado]
+              if (listaServir) cardClass = 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-emerald-200 shadow-md'
+              else if (demorada) cardClass = 'border-red-400 bg-red-50 text-red-900'
+              else if (semidemorada) cardClass = 'border-orange-400 bg-orange-50 text-orange-900'
+
               return (
                 <div
                   key={m.id}
-                  className={`relative rounded-2xl border-2 p-4 cursor-pointer transition-all hover:shadow-md select-none ${
-                    listaServir
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-emerald-200 shadow-md'
-                      : ESTADO_COLOR[m.estado]
-                  }`}
+                  className={`relative rounded-2xl border-2 p-4 cursor-pointer transition-all hover:shadow-md select-none ${cardClass}`}
                   onClick={() => setMesaActiva(m)}
                 >
                   {listaServir && (
                     <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse whitespace-nowrap">
                       🍽 Lista para servir
+                    </span>
+                  )}
+                  {demorada && !listaServir && (
+                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex items-center gap-0.5">
+                      <AlertCircle size={9} /> {minAbierta}m esperando
+                    </span>
+                  )}
+                  {semidemorada && !listaServir && (
+                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
+                      ⚠ {minAbierta}m
                     </span>
                   )}
                   <div className="flex items-start justify-between mb-3">
@@ -1138,6 +1456,8 @@ export default function Mesas() {
                     </div>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                       listaServir ? 'bg-emerald-200 text-emerald-800' :
+                      demorada ? 'bg-red-200 text-red-800' :
+                      semidemorada ? 'bg-orange-200 text-orange-800' :
                       m.estado === 'libre' ? 'bg-emerald-200 text-emerald-800' :
                       m.estado === 'ocupada' ? 'bg-amber-200 text-amber-900' : 'bg-red-200 text-red-800'
                     }`}>
@@ -1161,9 +1481,17 @@ export default function Mesas() {
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
+                        onClick={e => { e.stopPropagation(); setMesaHistorial(m) }}
+                        className="w-6 h-6 rounded-full bg-white/50 flex items-center justify-center hover:bg-violet-100 text-violet-400 transition-colors"
+                        title="Ver historial"
+                      >
+                        <History size={11} />
+                      </button>
+                      <button
+                        type="button"
                         onClick={e => { e.stopPropagation(); eliminarMesa(m) }}
                         disabled={deletingId === m.id || m.estado !== 'libre'}
-                        className="w-6 h-6 rounded-full opacity-0 group-hover:opacity-100 bg-white/50 flex items-center justify-center hover:bg-red-100 text-red-400 disabled:opacity-20 transition-opacity"
+                        className="w-6 h-6 rounded-full bg-white/50 flex items-center justify-center hover:bg-red-100 text-red-400 disabled:opacity-20 transition-colors"
                         title={m.estado !== 'libre' ? 'Solo se puede eliminar si está libre' : 'Eliminar mesa'}
                       >
                         <Trash2 size={11} />
@@ -1173,10 +1501,10 @@ export default function Mesas() {
                   </div>
                 </div>
               )
-            })
-          })()}
-        </div>
-      )}
+            })}
+          </div>
+        )
+      })()}
 
       {/* Gestión de mesas */}
       {mesas.length > 0 && (
@@ -1188,6 +1516,10 @@ export default function Mesas() {
 
       {showNueva && (
         <ModalNuevaMesa onSave={crearMesa} onClose={() => setShowNueva(false)} />
+      )}
+
+      {mesaHistorial && (
+        <HistorialModal mesa={mesaHistorial} onClose={() => setMesaHistorial(null)} />
       )}
 
       {mesaActiva && (

@@ -21,6 +21,10 @@ class ProductoIn(BaseModel):
     receta_id: Optional[int] = None
 
 
+class FotoIn(BaseModel):
+    data_url: str  # data:image/...;base64,...
+
+
 class ProductoOut(BaseModel):
     id: int
     nombre: str
@@ -84,6 +88,23 @@ def eliminar(pid: int, db: Session = Depends(get_db), _=Depends(require_auth)):
     p.activo = False
     db.commit()
     return {"ok": True}
+
+
+@router.post("/{pid}/foto", response_model=ProductoOut)
+def subir_foto(pid: int, data: FotoIn, db: Session = Depends(get_db), _=Depends(require_auth)):
+    """Guarda una imagen en base64 como foto del producto."""
+    p = db.query(Producto).filter(Producto.id == pid).first()
+    if not p:
+        raise HTTPException(404, "Producto no encontrado")
+    if not data.data_url.startswith("data:image/"):
+        raise HTTPException(400, "Formato inválido: se espera data:image/...")
+    # Limitar tamaño: base64 de 512KB ≈ 700KB de texto
+    if len(data.data_url) > 750_000:
+        raise HTTPException(400, "Imagen demasiado grande (máx 512KB)")
+    p.foto = data.data_url
+    db.commit()
+    db.refresh(p)
+    return p
 
 
 @router.post("/{pid}/agotar")

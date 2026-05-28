@@ -28,6 +28,8 @@ class PagoIn(BaseModel):
     descuento_pct: float = 0   # porcentaje de descuento 0-100
     descuento_monto: float = 0  # monto fijo adicional (se suma al calculado por %)
     propina: float = 0
+    pago2_tipo: str = ""        # segundo método de pago (split)
+    pago2_monto: float = 0      # monto del segundo método
 
 
 class ItemOut(BaseModel):
@@ -291,6 +293,8 @@ def cobrar(comanda_id: int, data: PagoIn, db: Session = Depends(get_db), auth=De
         monto_recibido=data.monto_recibido,
         vuelto=vuelto,
         numero_mesa=c.mesa.numero if c.mesa else 0,
+        pago2_tipo=data.pago2_tipo or "",
+        pago2_monto=data.pago2_monto or 0,
     )
     db.add(venta)
     c.estado = "cerrada"
@@ -329,7 +333,10 @@ def cobrar(comanda_id: int, data: PagoIn, db: Session = Depends(get_db), auth=De
             ingredientes_descontados += 1
 
     numero_mesa = c.mesa.numero if c.mesa else 0
-    db.add(AuditLog(accion="cobrar_mesa", detalle=f"Mesa {numero_mesa} cobrada ${total_final:,.0f} ({data.tipo_pago})", usuario_rol=auth["role"], referencia_id=comanda_id, referencia_tipo="comanda"))
+    pago_detalle = data.tipo_pago
+    if data.pago2_tipo:
+        pago_detalle += f" + {data.pago2_tipo} (${data.pago2_monto:,.0f})"
+    db.add(AuditLog(accion="cobrar_mesa", detalle=f"Mesa {numero_mesa} cobrada ${total_final:,.0f} ({pago_detalle})", usuario_rol=auth["role"], referencia_id=comanda_id, referencia_tipo="comanda"))
     db.commit()
     broadcast("comanda_cerrada", {"comanda_id": comanda_id, "numero_mesa": numero_mesa, "total": total_final})
     return {
@@ -339,6 +346,8 @@ def cobrar(comanda_id: int, data: PagoIn, db: Session = Depends(get_db), auth=De
         "propina": data.propina,
         "total": total_final,
         "vuelto": vuelto,
+        "pago2_tipo": data.pago2_tipo or "",
+        "pago2_monto": data.pago2_monto or 0,
         "ingredientes_descontados": ingredientes_descontados,
     }
 

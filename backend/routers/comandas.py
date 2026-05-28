@@ -78,16 +78,19 @@ def _build_comanda_out(c: Comanda) -> ComandaOut:
             notas=it.notas,
             listo=bool(it.listo),
         ))
+    # Siempre calculamos el total desde los items cargados, nunca desde c.total
+    # (que puede estar desactualizado por caché de sesión SQLAlchemy)
+    total_real = sum(it.subtotal for it in items)
     lista_para_servir = bool(items) and all(it.listo for it in items)
     return ComandaOut(
         id=c.id,
         mesa_id=c.mesa_id,
         numero_mesa=c.mesa.numero if c.mesa else 0,
-        numero_ticket=c.numero_ticket,
+        numero_ticket=getattr(c, 'numero_ticket', None),
         tipo=c.tipo if c.tipo else "mesa",
         cliente_nombre=c.cliente_nombre if c.cliente_nombre else "",
         estado=c.estado,
-        total=c.total,
+        total=total_real,
         notas=c.notas,
         created_at=c.created_at.isoformat() if c.created_at else "",
         items=items,

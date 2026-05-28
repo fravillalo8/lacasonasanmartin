@@ -19,8 +19,14 @@ async function request<T>(
     },
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail || 'Error en el servidor')
+    const text = await res.text().catch(() => '')
+    let detail = `HTTP ${res.status}`
+    try {
+      const err = JSON.parse(text)
+      if (typeof err.detail === 'string') detail = err.detail
+      else detail = `HTTP ${res.status}: ${text.slice(0, 120)}`
+    } catch { detail = `HTTP ${res.status}: ${text.slice(0, 120)}` }
+    throw new Error(detail)
   }
   return res.json()
 }

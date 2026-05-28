@@ -265,7 +265,7 @@ def cobrar(comanda_id: int, data: PagoIn, db: Session = Depends(get_db), _=Depen
     if not c:
         raise HTTPException(404, "Comanda no encontrada o ya cerrada")
 
-    subtotal = c.total
+    subtotal = sum(it.subtotal for it in c.items)
     descuento = round(subtotal * data.descuento_pct / 100, 0) + data.descuento_monto
     total_final = max(0, subtotal - descuento + data.propina)
     vuelto = max(0, data.monto_recibido - total_final)

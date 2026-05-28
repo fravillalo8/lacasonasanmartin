@@ -370,7 +370,7 @@ function ComandaPanel({
 
   const descPct = parseFloat(descuentoPct) || 0
   const propina = parseFloat(propinaVal) || 0
-  const subtotal = comanda?.total ?? 0
+  const subtotal = comanda?.items.reduce((sum, it) => sum + it.subtotal, 0) ?? 0
   const descMonto = Math.round(subtotal * descPct / 100)
   const totalFinal = Math.max(0, subtotal - descMonto + propina)
 

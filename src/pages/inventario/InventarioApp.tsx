@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { api } from './api/client'
 import Sidebar from './components/Sidebar'
+import OfflineBanner from './components/OfflineBanner'
 import Login from './Login'
 import Dashboard from './Dashboard'
 import Compras from './Compras'
@@ -30,6 +31,7 @@ export const useRole = () => useContext(RoleCtx)
 function Layout({ children, role }: { children: React.ReactNode; role: Role }) {
   return (
     <div className="flex min-h-screen" style={{ backgroundColor: '#fafaf9', color: '#1c1917' }}>
+      <OfflineBanner />
       <Sidebar role={role} />
       <main className="flex-1 overflow-y-auto">{children}</main>
     </div>

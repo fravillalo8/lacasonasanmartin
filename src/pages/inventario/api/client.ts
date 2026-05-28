@@ -6,10 +6,101 @@ function getToken() {
   return localStorage.getItem('inv_token') || ''
 }
 
+// ─── Offline infrastructure ────────────────────────────────────────────────
+
+export interface QueuedOp {
+  id: string
+  path: string
+  method: string
+  body?: unknown
+  timestamp: number
+}
+
+const Q_KEY = 'mc_offline_queue'
+const C_PREFIX = 'mc_cache_'
+
+export const offlineQ = {
+  get: (): QueuedOp[] => {
+    try { return JSON.parse(localStorage.getItem(Q_KEY) || '[]') } catch { return [] }
+  },
+  add: (op: Omit<QueuedOp, 'id' | 'timestamp'>): QueuedOp => {
+    const full: QueuedOp = { ...op, id: crypto.randomUUID(), timestamp: Date.now() }
+    localStorage.setItem(Q_KEY, JSON.stringify([...offlineQ.get(), full]))
+    return full
+  },
+  remove: (id: string) => {
+    localStorage.setItem(Q_KEY, JSON.stringify(offlineQ.get().filter(o => o.id !== id)))
+  },
+  count: (): number => offlineQ.get().length,
+}
+
+const apiCache = {
+  set: (key: string, data: unknown) =>
+    localStorage.setItem(C_PREFIX + key, JSON.stringify({ data, ts: Date.now() })),
+  get: <T>(key: string): T | null => {
+    try {
+      const s = localStorage.getItem(C_PREFIX + key)
+      return s ? (JSON.parse(s).data as T) : null
+    } catch { return null }
+  },
+}
+
+export class OfflineEnqueuedError extends Error {
+  readonly op: QueuedOp
+  constructor(op: QueuedOp) {
+    super('offline_enqueued')
+    this.name = 'OfflineEnqueuedError'
+    this.op = op
+  }
+}
+
+export async function syncQueue(): Promise<{ synced: number; failed: number }> {
+  const queue = offlineQ.get()
+  if (queue.length === 0) return { synced: 0, failed: 0 }
+  let synced = 0, failed = 0
+  for (const op of queue) {
+    try {
+      const res = await fetch(`${BASE}${op.path}`, {
+        method: op.method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: op.body !== undefined ? JSON.stringify(op.body) : undefined,
+      })
+      offlineQ.remove(op.id)
+      if (res.ok) synced++
+      else failed++ // op inválido (4xx) — descartar para no bloquear
+    } catch {
+      break // error de red — parar y reintentar próxima vez
+    }
+  }
+  return { synced, failed }
+}
+
+// ─── Request ───────────────────────────────────────────────────────────────
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const method = (options.method || 'GET').toUpperCase()
+
+  if (!navigator.onLine) {
+    if (method === 'GET') {
+      const cached = apiCache.get<T>(path)
+      if (cached !== null) return cached
+      throw new Error('Sin conexión y sin datos en caché')
+    }
+    // Mutar offline → encolar
+    const op = offlineQ.add({
+      path,
+      method,
+      body: options.body ? JSON.parse(options.body as string) : undefined,
+    })
+    throw new OfflineEnqueuedError(op)
+  }
+
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     headers: {
@@ -28,7 +119,9 @@ async function request<T>(
     } catch { detail = `HTTP ${res.status}: ${text.slice(0, 120)}` }
     throw new Error(detail)
   }
-  return res.json()
+  const data = await res.json() as T
+  if (method === 'GET') apiCache.set(path, data)
+  return data
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────

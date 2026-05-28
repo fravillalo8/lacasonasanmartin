@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { api } from './api/client'
-import type { Mesa, MesaIn, Comanda, Producto, PagoOut, MPDevice } from './api/client'
+import { api, OfflineEnqueuedError, syncQueue } from './api/client'
+import type { Mesa, MesaIn, Comanda, ItemComanda, Producto, PagoOut, MPDevice } from './api/client'
+import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import {
   Plus, X, Trash2, Settings, Users, ChevronRight, Minus, Clock, FileText, PenLine,
   CreditCard, Banknote, Smartphone, ArrowLeftRight, Check, Printer, Percent, ShoppingBag,
@@ -326,16 +327,31 @@ function ComandaPanel({
 
   async function confirmarNota() {
     if (!comanda || !notaModal) return
+    const { prod, notas } = notaModal
     setNotaModal(null)
     try {
       const updated = await api.comandas.agregarItem(comanda.id, {
-        producto_id: notaModal.prod.id,
+        producto_id: prod.id,
         cantidad: 1,
-        notas: notaModal.notas,
+        notas,
       })
       setComanda(updated)
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Error')
+      if (e instanceof OfflineEnqueuedError) {
+        const tempItem: ItemComanda = {
+          id: -(Date.now()),
+          producto_id: prod.id,
+          nombre_producto: prod.nombre,
+          cantidad: 1,
+          precio_unitario: prod.precio,
+          subtotal: prod.precio,
+          notas,
+          listo: false,
+        }
+        setComanda(c => c ? { ...c, items: [...c.items, tempItem] } : c)
+      } else {
+        setErr(e instanceof Error ? e.message : 'Error')
+      }
     }
   }
 
@@ -353,7 +369,19 @@ function ComandaPanel({
       const updated = await api.comandas.cambiarCantidad(comanda.id, item_id, nueva)
       setComanda(updated)
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Error')
+      if (e instanceof OfflineEnqueuedError) {
+        setComanda(c => {
+          if (!c) return c
+          const items = nueva <= 0
+            ? c.items.filter(it => it.id !== item_id)
+            : c.items.map(it => it.id === item_id
+                ? { ...it, cantidad: nueva, subtotal: it.precio_unitario * nueva }
+                : it)
+          return { ...c, items }
+        })
+      } else {
+        setErr(e instanceof Error ? e.message : 'Error')
+      }
     }
   }
 
@@ -881,6 +909,7 @@ export default function Mesas() {
   const [creandoDelivery, setCreandoDelivery] = useState(false)
   const [notifListas, setNotifListas] = useState<{ id: number; label: string }[]>([])
   const listasPrevRef = useRef<Set<number>>(new Set())
+  const online = useOnlineStatus()
 
   function detectarListas(cas: Comanda[]) {
     const nuevasListas = cas.filter(
@@ -935,6 +964,14 @@ export default function Mesas() {
     }, 20000)
     return () => clearInterval(interval)
   }, [])
+
+  // Sync pendientes al reconectar y refrescar mesas
+  useEffect(() => {
+    if (!online) return
+    syncQueue().then(({ synced }) => {
+      if (synced > 0) reload()
+    })
+  }, [online])
 
   async function crearMesa(data: MesaIn) {
     await api.mesas.create(data)

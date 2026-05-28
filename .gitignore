@@ -15,6 +15,25 @@ dist-ssr
 # Source assets (huge, not needed in repo — curated copies live in public/photos/)
 Fotos/
 
+# Generated zips for manual deploys
+casona-deploy.zip
+casona-deploy*/
+casona-deploy *.zip
+dist_*.zip
+
+# Tiendas (separate project, not part of this repo)
+Tiendas/
+
+# Backend secrets and generated files
+backend/.env
+backend/__pycache__/
+backend/routers/__pycache__/
+backend/services/__pycache__/
+backend/inventario.db
+
+# Sensitive files with API keys
+public/chat.php
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -25,3 +44,4 @@ Fotos/
 *.njsproj
 *.sln
 *.sw?
+venv/

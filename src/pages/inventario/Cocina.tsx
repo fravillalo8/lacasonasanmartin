@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { api } from './api/client'
+import { api, OfflineEnqueuedError, syncQueue } from './api/client'
 import type { Comanda } from './api/client'
+import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { RefreshCw, Clock, UtensilsCrossed, CheckCircle2, CheckCheck, History, ChevronDown, ChevronUp } from 'lucide-react'
 
 function minutos(iso: string): string {
@@ -195,6 +196,7 @@ export default function Cocina() {
   const [todoing, setTodoing] = useState<number | null>(null)
   const [showHistorial, setShowHistorial] = useState(false)
   const prevIdsRef = useRef<Set<number>>(new Set())
+  const online = useOnlineStatus()
 
   const reload = useCallback(async () => {
     try {
@@ -227,7 +229,15 @@ export default function Cocina() {
       const updated = await api.comandas.todoListo(comanda_id)
       setComandas(prev => prev.map(c => c.id === comanda_id ? updated : c))
     } catch (e: unknown) {
-      setFetchErr(`Error al marcar listo: ${e instanceof Error ? e.message : 'Error'}`)
+      if (e instanceof OfflineEnqueuedError) {
+        setComandas(prev => prev.map(c => c.id === comanda_id ? {
+          ...c,
+          items: c.items.map(it => ({ ...it, listo: true })),
+          lista_para_servir: c.items.length > 0,
+        } : c))
+      } else {
+        setFetchErr(`Error al marcar listo: ${e instanceof Error ? e.message : 'Error'}`)
+      }
     } finally {
       setTodoing(null)
     }
@@ -239,7 +249,15 @@ export default function Cocina() {
       const updated = await api.comandas.toggleListo(comanda_id, item_id)
       setComandas(prev => prev.map(c => c.id === comanda_id ? updated : c))
     } catch (e: unknown) {
-      setFetchErr(`Error al marcar ítem: ${e instanceof Error ? e.message : 'Error'}`)
+      if (e instanceof OfflineEnqueuedError) {
+        setComandas(prev => prev.map(c => {
+          if (c.id !== comanda_id) return c
+          const items = c.items.map(it => it.id === item_id ? { ...it, listo: !it.listo } : it)
+          return { ...c, items, lista_para_servir: items.length > 0 && items.every(it => it.listo) }
+        }))
+      } else {
+        setFetchErr(`Error al marcar ítem: ${e instanceof Error ? e.message : 'Error'}`)
+      }
     } finally {
       setToggling(null)
     }
@@ -250,6 +268,14 @@ export default function Cocina() {
     const interval = setInterval(reload, 10000)
     return () => clearInterval(interval)
   }, [reload])
+
+  // Sync pendientes al reconectar y refrescar datos
+  useEffect(() => {
+    if (!online) return
+    syncQueue().then(({ synced }) => {
+      if (synced > 0) reload()
+    })
+  }, [online, reload])
 
   // Separar en queue activo vs listos esperando mozo
   const enCocina = comandas.filter(c => !c.lista_para_servir)

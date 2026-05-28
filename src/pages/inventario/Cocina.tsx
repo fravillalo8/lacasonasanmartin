@@ -189,6 +189,7 @@ export default function Cocina() {
   const [comandas, setComandas] = useState<Comanda[]>([])
   const [historial, setHistorial] = useState<Comanda[]>([])
   const [loading, setLoading] = useState(true)
+  const [fetchErr, setFetchErr] = useState('')
   const [lastUpdate, setLastUpdate] = useState(new Date())
   const [toggling, setToggling] = useState<number | null>(null)
   const [todoing, setTodoing] = useState<number | null>(null)
@@ -209,8 +210,9 @@ export default function Cocina() {
       setComandas(data)
       setHistorial(hist)
       setLastUpdate(new Date())
-    } catch {
-      // silent retry
+      setFetchErr('')
+    } catch (e: unknown) {
+      setFetchErr(e instanceof Error ? e.message : 'Error al conectar con el servidor')
     } finally {
       setLoading(false)
     }
@@ -242,7 +244,7 @@ export default function Cocina() {
 
   useEffect(() => {
     reload()
-    const interval = setInterval(reload, 30000)
+    const interval = setInterval(reload, 10000)
     return () => clearInterval(interval)
   }, [reload])
 
@@ -289,6 +291,13 @@ export default function Cocina() {
           </button>
         </div>
       </div>
+
+      {fetchErr && (
+        <div className="mb-4 rounded-xl bg-red-900/60 border border-red-500/50 px-4 py-3 text-sm text-red-300 flex items-center gap-2">
+          <span className="font-bold">Error:</span> {fetchErr}
+          <button type="button" onClick={reload} className="ml-auto underline text-red-200 text-xs">Reintentar</button>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center h-48 text-stone-400">Cargando…</div>
@@ -369,8 +378,8 @@ export default function Cocina() {
 
       {/* Auto-refresh indicator */}
       <div className="fixed bottom-4 right-4 text-xs text-stone-600 flex items-center gap-1">
-        <RefreshCw size={11} className="animate-spin" style={{ animationDuration: '30s' }} />
-        Auto-actualiza cada 30s
+        <RefreshCw size={11} className="animate-spin" style={{ animationDuration: '10s' }} />
+        Auto-actualiza cada 10s
       </div>
     </div>
   )

@@ -70,16 +70,14 @@ def _build_comanda_out(c: Comanda) -> ComandaOut:
     for it in c.items:
         items.append(ItemOut(
             id=it.id,
-            producto_id=it.producto_id,
+            producto_id=it.producto_id or 0,
             nombre_producto=it.producto.nombre if it.producto else "",
-            cantidad=it.cantidad,
-            precio_unitario=it.precio_unitario,
-            subtotal=it.subtotal,
-            notas=it.notas,
+            cantidad=it.cantidad or 1,
+            precio_unitario=it.precio_unitario or 0.0,
+            subtotal=it.subtotal or 0.0,
+            notas=it.notas or "",
             listo=bool(it.listo),
         ))
-    # Siempre calculamos el total desde los items cargados, nunca desde c.total
-    # (que puede estar desactualizado por caché de sesión SQLAlchemy)
     total_real = sum(it.subtotal for it in items)
     lista_para_servir = bool(items) and all(it.listo for it in items)
     return ComandaOut(

@@ -226,8 +226,8 @@ export default function Cocina() {
     try {
       const updated = await api.comandas.todoListo(comanda_id)
       setComandas(prev => prev.map(c => c.id === comanda_id ? updated : c))
-    } catch {
-      // silent
+    } catch (e: unknown) {
+      setFetchErr(`Error al marcar listo: ${e instanceof Error ? e.message : 'Error'}`)
     } finally {
       setTodoing(null)
     }
@@ -238,8 +238,8 @@ export default function Cocina() {
     try {
       const updated = await api.comandas.toggleListo(comanda_id, item_id)
       setComandas(prev => prev.map(c => c.id === comanda_id ? updated : c))
-    } catch {
-      // silent
+    } catch (e: unknown) {
+      setFetchErr(`Error al marcar ítem: ${e instanceof Error ? e.message : 'Error'}`)
     } finally {
       setToggling(null)
     }
@@ -312,6 +312,11 @@ export default function Cocina() {
               <UtensilsCrossed size={40} className="opacity-30" />
               <p className="text-lg font-medium">Sin pedidos activos</p>
               <p className="text-sm">Las nuevas comandas aparecerán aquí automáticamente.</p>
+            </div>
+          ) : enCocina.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 text-emerald-400 gap-2">
+              <CheckCheck size={32} />
+              <p className="text-base font-semibold">¡Todo preparado!</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

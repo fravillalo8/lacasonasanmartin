@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="MesaControl — La Casona San Martín",
-    version="1.0.0",
+    version="1.1.0",
     docs_url="/api/docs",
     redoc_url=None,
     lifespan=lifespan,

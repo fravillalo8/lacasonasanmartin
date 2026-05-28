@@ -1,6 +1,7 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 from pydantic import BaseModel
 from typing import Optional
 from database import get_db
@@ -217,9 +218,9 @@ def agregar_item(comanda_id: int, data: ItemIn, db: Session = Depends(get_db), _
         db.add(item)
 
     db.flush()
-    # Expire c so the items relationship reloads from DB (includes the newly added item)
-    db.expire(c)
-    c.total = sum(it.subtotal for it in c.items)
+    c.total = db.query(func.sum(ItemComanda.subtotal)).filter(
+        ItemComanda.comanda_id == comanda_id
+    ).scalar() or 0.0
     db.commit()
 
     return _build_comanda_out(db.query(Comanda).options(
@@ -238,8 +239,9 @@ def quitar_item(comanda_id: int, item_id: int, db: Session = Depends(get_db), _=
         raise HTTPException(404, "Item no encontrado")
     db.delete(item)
     db.flush()
-    db.expire(c)
-    c.total = sum(it.subtotal for it in c.items)
+    c.total = db.query(func.sum(ItemComanda.subtotal)).filter(
+        ItemComanda.comanda_id == comanda_id
+    ).scalar() or 0.0
     db.commit()
 
     return _build_comanda_out(db.query(Comanda).options(
@@ -354,8 +356,9 @@ def cambiar_cantidad(comanda_id: int, item_id: int, data: CantidadIn,
         item.subtotal = item.precio_unitario * data.cantidad
 
     db.flush()
-    db.expire(c)
-    c.total = sum(it.subtotal for it in c.items)
+    c.total = db.query(func.sum(ItemComanda.subtotal)).filter(
+        ItemComanda.comanda_id == comanda_id
+    ).scalar() or 0.0
     db.commit()
 
     return _build_comanda_out(db.query(Comanda).options(

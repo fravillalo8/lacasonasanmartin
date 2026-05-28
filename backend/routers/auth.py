@@ -1,3 +1,4 @@
+import hmac
 import os
 import secrets
 import time
@@ -28,6 +29,32 @@ _tokens: dict[str, dict] = {}  # token -> {role, expires}
 _attempts: dict[str, list[float]] = {}
 MAX_ATTEMPTS = 5
 WINDOW_SECS = 60
+_CLEANUP_EVERY = 300  # limpiar estructuras cada 5 minutos
+_last_cleanup = 0.0
+
+
+def _real_ip(request: Request) -> str:
+    """Extrae la IP real del cliente (Railway corre detrás de proxy)."""
+    for header in ("x-real-ip", "x-forwarded-for"):
+        val = request.headers.get(header, "").split(",")[0].strip()
+        if val:
+            return val
+    return request.client.host if request.client else "unknown"
+
+
+def _cleanup_stale() -> None:
+    """Elimina tokens expirados y entradas de rate-limit antiguas."""
+    global _last_cleanup
+    now = time.time()
+    if now - _last_cleanup < _CLEANUP_EVERY:
+        return
+    _last_cleanup = now
+    expired_tokens = [t for t, v in _tokens.items() if v["expires"] < now]
+    for t in expired_tokens:
+        _tokens.pop(t, None)
+    stale_ips = [ip for ip, ts in _attempts.items() if not any(now - t < WINDOW_SECS for t in ts)]
+    for ip in stale_ips:
+        _attempts.pop(ip, None)
 
 
 def _check_rate(ip: str) -> None:
@@ -39,6 +66,16 @@ def _check_rate(ip: str) -> None:
     _attempts[ip] = recent
 
 
+def _verify_pin(candidate: str) -> "str | None":
+    """Verifica el PIN usando comparación de tiempo constante para evitar timing attacks."""
+    from typing import Optional
+    found_role: Optional[str] = None
+    for stored_pin, role in _pin_map.items():
+        if hmac.compare_digest(stored_pin.encode(), candidate.encode()):
+            found_role = role
+    return found_role
+
+
 # ─── Schemas ─────────────────────────────────────────────────────────────────
 class LoginRequest(BaseModel):
     pin: str
@@ -47,10 +84,11 @@ class LoginRequest(BaseModel):
 # ─── Endpoints ───────────────────────────────────────────────────────────────
 @router.post("/login")
 def login(req: LoginRequest, request: Request):
-    ip = request.client.host if request.client else "unknown"
+    ip = _real_ip(request)
     _check_rate(ip)
+    _cleanup_stale()
 
-    role = _pin_map.get(req.pin)
+    role = _verify_pin(req.pin)
     if not role:
         raise HTTPException(status_code=401, detail="PIN incorrecto")
 

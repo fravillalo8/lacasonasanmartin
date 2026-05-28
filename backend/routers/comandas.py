@@ -2,7 +2,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from database import get_db
 from models import Mesa, Comanda, ItemComanda, Producto, Venta, Receta, ItemReceta, Ingrediente, MovimientoStock, AuditLog
@@ -30,6 +30,20 @@ class PagoIn(BaseModel):
     propina: float = 0
     pago2_tipo: str = ""        # segundo método de pago (split)
     pago2_monto: float = 0      # monto del segundo método
+
+    @field_validator("descuento_pct")
+    @classmethod
+    def descuento_pct_rango(cls, v: float) -> float:
+        if not (0 <= v <= 100):
+            raise ValueError("descuento_pct debe estar entre 0 y 100")
+        return v
+
+    @field_validator("descuento_monto", "propina", "pago2_monto", "monto_recibido")
+    @classmethod
+    def no_negativo(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("El monto no puede ser negativo")
+        return v
 
 
 class ItemOut(BaseModel):

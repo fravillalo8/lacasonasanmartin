@@ -7,7 +7,7 @@
     "dev": "concurrently -n \"API,WEB\" -c \"green,cyan\" \"backend/venv/bin/python3 backend/main.py\" \"vite\"",
     "dev:web": "vite",
     "dev:api": "backend/venv/bin/python3 backend/main.py",
-    "build": "vite build",
+    "build": "vite build && rm -f dist/chat.php",
     "lint": "eslint .",
     "preview": "vite preview"
   },

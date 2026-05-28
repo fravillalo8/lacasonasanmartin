@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel
 from typing import Optional
 from database import get_db
-from models import Mesa, Comanda, ItemComanda
+from models import Mesa, Comanda, ItemComanda, Venta
 from routers.auth import require_auth
 
 router = APIRouter(prefix="/api/mesas", tags=["mesas"])
@@ -121,8 +121,6 @@ def historial(mid: int, limit: int = 10, db: Session = Depends(get_db), _=Depend
             }
             for it in c.items
         ]
-        # Buscar venta asociada
-        from models import Venta
         venta = db.query(Venta).filter(Venta.comanda_id == c.id).first()
         result.append({
             "id": c.id,

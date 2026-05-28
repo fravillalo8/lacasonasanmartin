@@ -48,6 +48,11 @@ def init_db():
         "ALTER TABLE productos ADD COLUMN receta_id INTEGER REFERENCES recetas(id)",
         "ALTER TABLE items_comanda ADD COLUMN listo BOOLEAN DEFAULT FALSE",
         "ALTER TABLE comandas ADD COLUMN numero_ticket INTEGER",
+        # v1.3.0
+        "ALTER TABLE mesas ADD COLUMN posicion_x INTEGER DEFAULT 0",
+        "ALTER TABLE mesas ADD COLUMN posicion_y INTEGER DEFAULT 0",
+        "ALTER TABLE ventas ADD COLUMN pago2_tipo VARCHAR(20) DEFAULT ''",
+        "ALTER TABLE ventas ADD COLUMN pago2_monto FLOAT DEFAULT 0",
     ]
     with engine.connect() as conn:
         for sql in migrations:

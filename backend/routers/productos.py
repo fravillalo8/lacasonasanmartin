@@ -42,13 +42,19 @@ class ProductoOut(BaseModel):
 
 @router.get("/carta", response_model=list[ProductoOut])
 def carta_publica(db: Session = Depends(get_db)):
-    """Endpoint público: devuelve productos activos para la carta digital (sin auth)."""
-    return (
+    """Endpoint público: devuelve productos activos para la carta digital (sin auth).
+    Las fotos en base64 se omiten para no enviar MBs de datos al cliente.
+    """
+    productos = (
         db.query(Producto)
         .filter(Producto.activo == True)
         .order_by(Producto.categoria, Producto.nombre)
         .all()
     )
+    for p in productos:
+        if p.foto and p.foto.startswith("data:"):
+            p.foto = ""
+    return productos
 
 
 @router.get("", response_model=list[ProductoOut])

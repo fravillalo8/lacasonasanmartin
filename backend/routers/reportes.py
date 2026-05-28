@@ -492,7 +492,7 @@ def ventas_csv(
     ventas = db.query(Venta).filter(Venta.created_at >= desde).order_by(Venta.created_at.desc()).all()
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["Fecha", "Mesa", "Subtotal", "Descuento", "Propina", "Total", "Tipo pago"])
+    writer.writerow(["Fecha", "Mesa", "Subtotal", "Descuento", "Propina", "Total", "Tipo pago", "Pago 2", "Monto pago 2"])
     for v in ventas:
         writer.writerow([
             v.created_at.strftime("%d/%m/%Y %H:%M") if v.created_at else "",
@@ -502,6 +502,8 @@ def ventas_csv(
             round(v.propina or 0, 0),
             round(v.total or 0, 0),
             v.tipo_pago or "",
+            getattr(v, "pago2_tipo", "") or "",
+            round(getattr(v, "pago2_monto", 0) or 0, 0),
         ])
     buf.seek(0)
     return StreamingResponse(

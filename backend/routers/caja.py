@@ -1,10 +1,10 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
 from typing import Optional
 from database import get_db
-from models import Venta, GastoDia, Comanda, ItemComanda
+from models import Venta, GastoDia
 from routers.auth import require_auth
 
 router = APIRouter(prefix="/api/caja", tags=["caja"])
@@ -16,13 +16,20 @@ class GastoIn(BaseModel):
     categoria: str = "otros"
     fecha: Optional[str] = None
 
+    @field_validator("monto")
+    @classmethod
+    def monto_positivo(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("El monto no puede ser negativo")
+        return v
+
 
 @router.get("/cierre")
 def cierre_caja(fecha: Optional[str] = Query(None), db: Session = Depends(get_db), _=Depends(require_auth)):
-    if fecha:
-        dia = datetime.fromisoformat(fecha)
-    else:
-        dia = datetime.utcnow()
+    try:
+        dia = datetime.fromisoformat(fecha) if fecha else datetime.utcnow()
+    except ValueError:
+        raise HTTPException(400, "Formato de fecha inválido (use YYYY-MM-DD)")
 
     inicio = dia.replace(hour=0, minute=0, second=0, microsecond=0)
     fin = dia.replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -33,9 +40,15 @@ def cierre_caja(fecha: Optional[str] = Query(None), db: Session = Depends(get_db
     total_ventas = sum(v.total for v in ventas)
     total_gastos = sum(g.monto for g in gastos)
 
+    # Desglose por método de pago — incluyendo segundo método de pago mixto
     por_pago: dict = {}
     for v in ventas:
-        por_pago[v.tipo_pago] = round(por_pago.get(v.tipo_pago, 0) + v.total, 0)
+        pago2_monto = getattr(v, "pago2_monto", 0) or 0
+        pago2_tipo = getattr(v, "pago2_tipo", "") or ""
+        monto_pago1 = v.total - pago2_monto if pago2_monto > 0 else v.total
+        por_pago[v.tipo_pago] = round(por_pago.get(v.tipo_pago, 0) + monto_pago1, 0)
+        if pago2_tipo and pago2_monto > 0:
+            por_pago[pago2_tipo] = round(por_pago.get(pago2_tipo, 0) + pago2_monto, 0)
 
     efectivo = por_pago.get("efectivo", 0)
     no_efectivo = round(total_ventas - efectivo, 0)
@@ -64,6 +77,8 @@ def cierre_caja(fecha: Optional[str] = Query(None), db: Session = Depends(get_db
                 "id": v.id,
                 "numero_mesa": v.numero_mesa,
                 "tipo_pago": v.tipo_pago,
+                "pago2_tipo": getattr(v, "pago2_tipo", "") or "",
+                "pago2_monto": getattr(v, "pago2_monto", 0) or 0,
                 "subtotal": v.subtotal,
                 "descuento": v.descuento,
                 "propina": v.propina,
@@ -92,7 +107,10 @@ def listar_gastos(db: Session = Depends(get_db), _=Depends(require_auth)):
 
 @router.post("/gastos")
 def agregar_gasto(data: GastoIn, db: Session = Depends(get_db), _=Depends(require_auth)):
-    fecha = datetime.fromisoformat(data.fecha) if data.fecha else datetime.utcnow()
+    try:
+        fecha = datetime.fromisoformat(data.fecha) if data.fecha else datetime.utcnow()
+    except ValueError:
+        raise HTTPException(400, "Formato de fecha inválido")
     g = GastoDia(descripcion=data.descripcion, monto=data.monto, categoria=data.categoria, fecha=fecha)
     db.add(g)
     db.commit()

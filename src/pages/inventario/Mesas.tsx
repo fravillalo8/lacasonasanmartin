@@ -4,7 +4,7 @@ import type { Mesa, MesaIn, Comanda, Producto, PagoOut, MPDevice } from './api/c
 import {
   Plus, X, Trash2, Settings, Users, ChevronRight, Minus, Clock, FileText, PenLine,
   CreditCard, Banknote, Smartphone, ArrowLeftRight, Check, Printer, Percent, ShoppingBag,
-  TrendingUp,
+  TrendingUp, Bell,
 } from 'lucide-react'
 import type { VentasResumen } from './api/client'
 
@@ -22,6 +22,26 @@ const ESTADO_LABEL: Record<string, string> = {
   libre: 'Libre',
   ocupada: 'Ocupada',
   cuenta: 'Cuenta',
+}
+
+function playBeepServir() {
+  try {
+    const ctx = new AudioContext()
+    const notas = [523, 659, 784, 1047] // Do-Mi-Sol-Do (C5→C6), más agradable
+    notas.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = freq
+      const t = ctx.currentTime + i * 0.14
+      gain.gain.setValueAtTime(0.28, t)
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28)
+      osc.start(t)
+      osc.stop(t + 0.28)
+    })
+  } catch { }
 }
 
 function minutos(iso: string): string {
@@ -826,6 +846,27 @@ export default function Mesas() {
   const [deliveryNombre, setDeliveryNombre] = useState('')
   const [deliveryComanda, setDeliveryComanda] = useState<Comanda | null>(null)
   const [creandoDelivery, setCreandoDelivery] = useState(false)
+  const [notifListas, setNotifListas] = useState<{ id: number; label: string }[]>([])
+  const listasPrevRef = useRef<Set<number>>(new Set())
+
+  function detectarListas(cas: Comanda[]) {
+    const nuevasListas = cas.filter(
+      c => c.lista_para_servir && !listasPrevRef.current.has(c.id)
+    )
+    if (nuevasListas.length > 0) {
+      playBeepServir()
+      setNotifListas(prev => [
+        ...prev,
+        ...nuevasListas.map(c => ({
+          id: c.id,
+          label: c.tipo === 'delivery'
+            ? `Para llevar — ${c.cliente_nombre || 'sin nombre'}`
+            : `Mesa ${c.numero_mesa}${c.numero_ticket ? ` · Ticket #${c.numero_ticket}` : ''}`,
+        })),
+      ])
+    }
+    listasPrevRef.current = new Set(cas.filter(c => c.lista_para_servir).map(c => c.id))
+  }
 
   async function reload() {
     setLoading(true)
@@ -840,6 +881,7 @@ export default function Mesas() {
       setProductos(p)
       setComandasActivas(cas)
       if (res) setResumenHoy(res.hoy)
+      detectarListas(cas)
     } finally {
       setLoading(false)
     }
@@ -847,9 +889,16 @@ export default function Mesas() {
 
   useEffect(() => {
     reload()
-    const interval = setInterval(() => {
-      api.mesas.list().then(m => setMesas(m)).catch(() => {})
-      api.comandas.activos().then(cas => setComandasActivas(cas)).catch(() => {})
+    const interval = setInterval(async () => {
+      try {
+        const [m, cas] = await Promise.all([
+          api.mesas.list(),
+          api.comandas.activos(),
+        ])
+        setMesas(m)
+        setComandasActivas(cas)
+        detectarListas(cas)
+      } catch { }
     }, 20000)
     return () => clearInterval(interval)
   }, [])
@@ -886,6 +935,31 @@ export default function Mesas() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Banner: cocina lista para servir */}
+      {notifListas.length > 0 && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 w-full max-w-sm px-4">
+          {notifListas.map(n => (
+            <div
+              key={n.id}
+              className="bg-emerald-600 text-white rounded-2xl shadow-2xl px-5 py-4 flex items-center gap-4"
+            >
+              <Bell size={20} className="shrink-0 animate-bounce" />
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm leading-tight">🍽 Lista para servir</p>
+                <p className="text-emerald-100 text-xs mt-0.5 truncate">{n.label}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNotifListas(prev => prev.filter(x => x.id !== n.id))}
+                className="shrink-0 bg-white/20 hover:bg-white/30 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
+              >
+                Entendido
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-stone-800">Mesas y comandas</h1>
         <div className="flex items-center gap-2">
@@ -958,22 +1032,33 @@ export default function Mesas() {
             }
             return mesas.map(m => {
               const comanda = comandaByMesa[m.id]
+              const listaServir = comanda?.lista_para_servir ?? false
               return (
                 <div
                   key={m.id}
-                  className={`relative rounded-2xl border-2 p-4 cursor-pointer transition-all hover:shadow-md select-none ${ESTADO_COLOR[m.estado]}`}
+                  className={`relative rounded-2xl border-2 p-4 cursor-pointer transition-all hover:shadow-md select-none ${
+                    listaServir
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-emerald-200 shadow-md'
+                      : ESTADO_COLOR[m.estado]
+                  }`}
                   onClick={() => setMesaActiva(m)}
                 >
+                  {listaServir && (
+                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse whitespace-nowrap">
+                      🍽 Lista para servir
+                    </span>
+                  )}
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <p className="font-bold text-2xl leading-none">{m.numero}</p>
                       {m.nombre && <p className="text-xs mt-0.5 opacity-70">{m.nombre}</p>}
                     </div>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      listaServir ? 'bg-emerald-200 text-emerald-800' :
                       m.estado === 'libre' ? 'bg-emerald-200 text-emerald-800' :
                       m.estado === 'ocupada' ? 'bg-amber-200 text-amber-900' : 'bg-red-200 text-red-800'
                     }`}>
-                      {ESTADO_LABEL[m.estado]}
+                      {listaServir ? 'Lista' : ESTADO_LABEL[m.estado]}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -992,6 +1077,7 @@ export default function Mesas() {
                     </div>
                     <div className="flex items-center gap-1">
                       <button
+                        type="button"
                         onClick={e => { e.stopPropagation(); eliminarMesa(m) }}
                         disabled={deletingId === m.id || m.estado !== 'libre'}
                         className="w-6 h-6 rounded-full opacity-0 group-hover:opacity-100 bg-white/50 flex items-center justify-center hover:bg-red-100 text-red-400 disabled:opacity-20 transition-opacity"

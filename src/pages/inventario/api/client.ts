@@ -183,6 +183,8 @@ export const api = {
       }),
     toggleListo: (id: number, item_id: number) =>
       request<Comanda>(`/comandas/${id}/items/${item_id}/listo`, { method: 'POST' }),
+    todoListo: (id: number) =>
+      request<Comanda>(`/comandas/${id}/todo-listo`, { method: 'POST' }),
     pedirCuenta: (id: number) =>
       request<Comanda>(`/comandas/${id}/pedir-cuenta`, { method: 'POST' }),
   },
@@ -575,6 +577,7 @@ export interface Comanda {
   notas: string
   created_at: string
   items: ItemComanda[]
+  lista_para_servir: boolean
 }
 
 export interface Reserva {

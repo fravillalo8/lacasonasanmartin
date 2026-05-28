@@ -54,6 +54,7 @@ class ComandaOut(BaseModel):
     notas: str
     created_at: str
     items: list[ItemOut]
+    lista_para_servir: bool = False
 
     class Config:
         from_attributes = True
@@ -76,6 +77,7 @@ def _build_comanda_out(c: Comanda) -> ComandaOut:
             notas=it.notas,
             listo=bool(it.listo),
         ))
+    lista_para_servir = bool(items) and all(it.listo for it in items)
     return ComandaOut(
         id=c.id,
         mesa_id=c.mesa_id,
@@ -88,6 +90,7 @@ def _build_comanda_out(c: Comanda) -> ComandaOut:
         notas=c.notas,
         created_at=c.created_at.isoformat() if c.created_at else "",
         items=items,
+        lista_para_servir=lista_para_servir,
     )
 
 
@@ -359,6 +362,21 @@ def toggle_item_listo(comanda_id: int, item_id: int,
     item.listo = not item.listo
     db.commit()
 
+    return _build_comanda_out(db.query(Comanda).options(
+        joinedload(Comanda.mesa),
+        joinedload(Comanda.items).joinedload(ItemComanda.producto)
+    ).filter(Comanda.id == comanda_id).first())
+
+
+@router.post("/{comanda_id}/todo-listo", response_model=ComandaOut)
+def todo_listo(comanda_id: int, db: Session = Depends(get_db), _=Depends(require_auth)):
+    """Cocina marca todos los ítems de la comanda como preparados de una vez."""
+    items = db.query(ItemComanda).filter(ItemComanda.comanda_id == comanda_id).all()
+    if not items:
+        raise HTTPException(404, "Comanda sin items")
+    for item in items:
+        item.listo = True
+    db.commit()
     return _build_comanda_out(db.query(Comanda).options(
         joinedload(Comanda.mesa),
         joinedload(Comanda.items).joinedload(ItemComanda.producto)

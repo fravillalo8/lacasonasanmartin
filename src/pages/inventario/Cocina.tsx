@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { api } from './api/client'
 import type { Comanda } from './api/client'
-import { RefreshCw, Clock, UtensilsCrossed, CheckCircle2 } from 'lucide-react'
+import { RefreshCw, Clock, UtensilsCrossed, CheckCircle2, CheckCheck } from 'lucide-react'
 
 function minutos(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -42,6 +42,7 @@ export default function Cocina() {
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(new Date())
   const [toggling, setToggling] = useState<number | null>(null)
+  const [todoing, setTodoing] = useState<number | null>(null)
   const prevIdsRef = useRef<Set<number>>(new Set())
 
   const reload = useCallback(async () => {
@@ -60,6 +61,18 @@ export default function Cocina() {
       setLoading(false)
     }
   }, [])
+
+  async function todoListo(comanda_id: number) {
+    setTodoing(comanda_id)
+    try {
+      const updated = await api.comandas.todoListo(comanda_id)
+      setComandas(prev => prev.map(c => c.id === comanda_id ? updated : c))
+    } catch {
+      // silent
+    } finally {
+      setTodoing(null)
+    }
+  }
 
   async function toggleListo(comanda_id: number, item_id: number) {
     setToggling(item_id)
@@ -178,18 +191,37 @@ export default function Cocina() {
                 ))}
               </div>
 
-              {/* Progreso */}
+              {/* Progreso + Todo listo */}
               {c.items.length > 0 && (
-                <div className="flex items-center gap-2 pt-1">
-                  <div className="flex-1 h-1.5 bg-stone-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                      style={{ width: `${(c.items.filter(i => i.listo).length / c.items.length) * 100}%` }}
-                    />
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-stone-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                        style={{ width: `${(c.items.filter(i => i.listo).length / c.items.length) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-stone-400 shrink-0">
+                      {c.items.filter(i => i.listo).length}/{c.items.length}
+                    </span>
                   </div>
-                  <span className="text-xs text-stone-400 shrink-0">
-                    {c.items.filter(i => i.listo).length}/{c.items.length}
-                  </span>
+                  {!c.lista_para_servir && (
+                    <button
+                      type="button"
+                      onClick={() => todoListo(c.id)}
+                      disabled={todoing === c.id}
+                      className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-2 rounded-xl text-sm transition-colors"
+                    >
+                      <CheckCheck size={15} />
+                      {todoing === c.id ? 'Marcando…' : '✓ Todo listo'}
+                    </button>
+                  )}
+                  {c.lista_para_servir && (
+                    <div className="w-full flex items-center justify-center gap-2 bg-emerald-900/60 border border-emerald-600 text-emerald-400 font-bold py-2 rounded-xl text-sm">
+                      <CheckCheck size={15} />
+                      Listo — esperando al mozo
+                    </div>
+                  )}
                 </div>
               )}
 

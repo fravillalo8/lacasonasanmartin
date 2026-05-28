@@ -374,6 +374,11 @@ export const api = {
       request<{ ok: boolean }>(`/mp-point/intents/${device_id}/${intent_id}`, { method: 'DELETE' }),
   },
 
+  // ─── Auditoría ────────────────────────────────────────────────────────────
+  auditoria: {
+    list: (dias = 7) => request<AuditEntry[]>(`/auditoria?dias=${dias}`),
+  },
+
   // ─── Cotizador ────────────────────────────────────────────────────────────
   cotizador: {
     comparar: () => request<ComparacionData>('/cotizador/comparar'),
@@ -538,6 +543,7 @@ export interface DashboardData {
   num_ventas_hoy: number
   ventas_mes: number
   num_ventas_mes: number
+  top_hoy: { nombre: string; cantidad: number }[]
   ultimas_compras: {
     id: number
     nombre_proveedor: string
@@ -545,6 +551,16 @@ export interface DashboardData {
     monto_total: number
     verificado_sii: boolean
   }[]
+}
+
+export interface AuditEntry {
+  id: number
+  accion: string
+  detalle: string
+  usuario_rol: string
+  referencia_id: number | null
+  referencia_tipo: string | null
+  fecha: string
 }
 
 export interface PagoIn {

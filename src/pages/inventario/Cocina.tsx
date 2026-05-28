@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { api, OfflineEnqueuedError, syncQueue } from './api/client'
 import type { Comanda } from './api/client'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
-import { RefreshCw, Clock, UtensilsCrossed, CheckCircle2, CheckCheck, History, ChevronDown, ChevronUp } from 'lucide-react'
+import { useSSE } from '../../hooks/useSSE'
+import { RefreshCw, Clock, UtensilsCrossed, CheckCircle2, CheckCheck, History, ChevronDown, ChevronUp, Wifi } from 'lucide-react'
 
 function minutos(iso: string): string {
   const diff = Date.now() - new Date(iso + 'Z').getTime()
@@ -37,6 +38,7 @@ function playBeep() {
       osc.stop(t + 0.22)
     })
   } catch { }
+  try { navigator.vibrate?.([200, 100, 200]) } catch { }
 }
 
 function clpFormat(n: number) {
@@ -195,6 +197,7 @@ export default function Cocina() {
   const [toggling, setToggling] = useState<number | null>(null)
   const [todoing, setTodoing] = useState<number | null>(null)
   const [showHistorial, setShowHistorial] = useState(false)
+  const [sseConnected, setSseConnected] = useState(false)
   const prevIdsRef = useRef<Set<number>>(new Set())
   const online = useOnlineStatus()
 
@@ -263,11 +266,20 @@ export default function Cocina() {
     }
   }
 
+  // Carga inicial + polling de respaldo cada 30s (SSE es la vía principal)
   useEffect(() => {
     reload()
-    const interval = setInterval(reload, 10000)
+    const interval = setInterval(reload, 30000)
     return () => clearInterval(interval)
   }, [reload])
+
+  // SSE: actualización instantánea cuando llega evento del servidor
+  useSSE((type) => {
+    if (type === 'comanda_nueva' || type === 'comanda_update' || type === 'comanda_cerrada' || type === 'lista_para_servir') {
+      setSseConnected(true)
+      reload()
+    }
+  })
 
   // Sync pendientes al reconectar y refrescar datos
   useEffect(() => {
@@ -410,10 +422,13 @@ export default function Cocina() {
         </>
       )}
 
-      {/* Auto-refresh indicator */}
-      <div className="fixed bottom-4 right-4 text-xs text-stone-600 flex items-center gap-1">
-        <RefreshCw size={11} className="animate-spin" style={{ animationDuration: '10s' }} />
-        Auto-actualiza cada 10s
+      {/* Conexión indicator */}
+      <div className="fixed bottom-4 right-4 text-xs text-stone-600 flex items-center gap-1.5">
+        {sseConnected ? (
+          <><Wifi size={11} className="text-emerald-500" /><span className="text-emerald-600">En vivo</span></>
+        ) : (
+          <><RefreshCw size={11} className="animate-spin" style={{ animationDuration: '30s' }} /><span>Cada 30s</span></>
+        )}
       </div>
     </div>
   )

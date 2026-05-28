@@ -264,3 +264,15 @@ class PrecioProveedor(Base):
 
     proveedor = relationship("Proveedor", back_populates="precios")
     ingrediente = relationship("Ingrediente")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    accion = Column(String(100), default="")        # cobrar_mesa, agregar_item, cancelar, etc.
+    detalle = Column(Text, default="")              # descripción legible
+    usuario_rol = Column(String(20), default="")   # admin, mozo, cocina
+    referencia_id = Column(Integer, nullable=True)  # comanda_id, venta_id, etc.
+    referencia_tipo = Column(String(30), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

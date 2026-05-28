@@ -21,6 +21,7 @@ import {
   Truck,
   Calculator,
   HelpCircle,
+  Shield,
 } from 'lucide-react'
 import type { Role } from '../InventarioApp'
 
@@ -55,6 +56,7 @@ const NAV: NavItem[] = [
   { to: '/mesa-central/proveedores', label: 'Proveedores', icon: Truck, roles: ['admin'] },
   { to: '/mesa-central/cotizador', label: 'Cotizador', icon: Calculator, roles: ['admin'] },
   { to: '/mesa-central/reportes', label: 'Reportes', icon: BarChart3, roles: ['admin'] },
+  { to: '/mesa-central/auditoria', label: 'Auditoría', icon: Shield, roles: ['admin'] },
   { to: '/mesa-central/config', label: 'Configuración', icon: Settings, roles: ['admin'] },
   { to: '/mesa-central/manual', label: 'Manual', icon: HelpCircle, roles: ['admin', 'mozo', 'cocina'] },
 ]

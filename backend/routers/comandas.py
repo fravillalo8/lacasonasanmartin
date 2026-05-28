@@ -5,8 +5,9 @@ from sqlalchemy import func
 from pydantic import BaseModel
 from typing import Optional
 from database import get_db
-from models import Mesa, Comanda, ItemComanda, Producto, Venta, Receta, ItemReceta, Ingrediente, MovimientoStock
+from models import Mesa, Comanda, ItemComanda, Producto, Venta, Receta, ItemReceta, Ingrediente, MovimientoStock, AuditLog
 from routers.auth import require_auth
+from routers.events import broadcast
 
 router = APIRouter(prefix="/api/comandas", tags=["comandas"])
 
@@ -112,7 +113,7 @@ def _asignar_ticket(db: Session) -> int:
 
 
 @router.post("/abrir/{mesa_id}", response_model=ComandaOut)
-def abrir_comanda(mesa_id: int, db: Session = Depends(get_db), _=Depends(require_auth)):
+def abrir_comanda(mesa_id: int, db: Session = Depends(get_db), auth=Depends(require_auth)):
     mesa = db.query(Mesa).filter(Mesa.id == mesa_id).first()
     if not mesa:
         raise HTTPException(404, "Mesa no encontrada")
@@ -127,10 +128,14 @@ def abrir_comanda(mesa_id: int, db: Session = Depends(get_db), _=Depends(require
     db.add(c)
     db.commit()
     db.refresh(c)
-    return _build_comanda_out(db.query(Comanda).options(
+    out = _build_comanda_out(db.query(Comanda).options(
         joinedload(Comanda.mesa),
         joinedload(Comanda.items).joinedload(ItemComanda.producto)
     ).filter(Comanda.id == c.id).first())
+    broadcast("comanda_nueva", {"comanda_id": c.id, "numero_mesa": mesa.numero})
+    db.add(AuditLog(accion="abrir_mesa", detalle=f"Mesa {mesa.numero} abierta", usuario_rol=auth["role"], referencia_id=c.id, referencia_tipo="comanda"))
+    db.commit()
+    return out
 
 
 @router.get("/cocina")
@@ -197,7 +202,7 @@ def ver_comanda(comanda_id: int, db: Session = Depends(get_db), _=Depends(requir
 
 
 @router.post("/{comanda_id}/items", response_model=ComandaOut)
-def agregar_item(comanda_id: int, data: ItemIn, db: Session = Depends(get_db), _=Depends(require_auth)):
+def agregar_item(comanda_id: int, data: ItemIn, db: Session = Depends(get_db), auth=Depends(require_auth)):
     c = db.query(Comanda).filter(Comanda.id == comanda_id, Comanda.estado == "abierta").first()
     if not c:
         raise HTTPException(404, "Comanda no encontrada o ya cerrada")
@@ -205,7 +210,6 @@ def agregar_item(comanda_id: int, data: ItemIn, db: Session = Depends(get_db), _
     if not prod:
         raise HTTPException(404, "Producto no encontrado")
 
-    # If product already in comanda, increase quantity
     existing = next((it for it in c.items if it.producto_id == data.producto_id), None)
     if existing:
         existing.cantidad += data.cantidad
@@ -227,20 +231,25 @@ def agregar_item(comanda_id: int, data: ItemIn, db: Session = Depends(get_db), _
     ).scalar() or 0.0
     db.commit()
 
-    return _build_comanda_out(db.query(Comanda).options(
+    out = _build_comanda_out(db.query(Comanda).options(
         joinedload(Comanda.mesa),
         joinedload(Comanda.items).joinedload(ItemComanda.producto)
     ).filter(Comanda.id == comanda_id).first())
+    broadcast("comanda_update", {"comanda_id": comanda_id, "numero_mesa": out.numero_mesa})
+    db.add(AuditLog(accion="agregar_item", detalle=f"{prod.nombre} ×{data.cantidad} → comanda #{comanda_id}", usuario_rol=auth["role"], referencia_id=comanda_id, referencia_tipo="comanda"))
+    db.commit()
+    return out
 
 
 @router.delete("/{comanda_id}/items/{item_id}", response_model=ComandaOut)
-def quitar_item(comanda_id: int, item_id: int, db: Session = Depends(get_db), _=Depends(require_auth)):
+def quitar_item(comanda_id: int, item_id: int, db: Session = Depends(get_db), auth=Depends(require_auth)):
     c = db.query(Comanda).filter(Comanda.id == comanda_id, Comanda.estado == "abierta").first()
     if not c:
         raise HTTPException(404, "Comanda no encontrada o ya cerrada")
     item = db.query(ItemComanda).filter(ItemComanda.id == item_id, ItemComanda.comanda_id == comanda_id).first()
     if not item:
         raise HTTPException(404, "Item no encontrado")
+    nombre_item = item.producto.nombre if item.producto else f"item#{item_id}"
     db.delete(item)
     db.flush()
     c.total = db.query(func.sum(ItemComanda.subtotal)).filter(
@@ -248,14 +257,18 @@ def quitar_item(comanda_id: int, item_id: int, db: Session = Depends(get_db), _=
     ).scalar() or 0.0
     db.commit()
 
-    return _build_comanda_out(db.query(Comanda).options(
+    out = _build_comanda_out(db.query(Comanda).options(
         joinedload(Comanda.mesa),
         joinedload(Comanda.items).joinedload(ItemComanda.producto)
     ).filter(Comanda.id == comanda_id).first())
+    broadcast("comanda_update", {"comanda_id": comanda_id, "numero_mesa": out.numero_mesa})
+    db.add(AuditLog(accion="quitar_item", detalle=f"{nombre_item} eliminado de comanda #{comanda_id}", usuario_rol=auth["role"], referencia_id=comanda_id, referencia_tipo="comanda"))
+    db.commit()
+    return out
 
 
 @router.post("/{comanda_id}/cobrar")
-def cobrar(comanda_id: int, data: PagoIn, db: Session = Depends(get_db), _=Depends(require_auth)):
+def cobrar(comanda_id: int, data: PagoIn, db: Session = Depends(get_db), auth=Depends(require_auth)):
     c = db.query(Comanda).options(
         joinedload(Comanda.mesa),
         joinedload(Comanda.items)
@@ -315,7 +328,10 @@ def cobrar(comanda_id: int, data: PagoIn, db: Session = Depends(get_db), _=Depen
             ))
             ingredientes_descontados += 1
 
+    numero_mesa = c.mesa.numero if c.mesa else 0
+    db.add(AuditLog(accion="cobrar_mesa", detalle=f"Mesa {numero_mesa} cobrada ${total_final:,.0f} ({data.tipo_pago})", usuario_rol=auth["role"], referencia_id=comanda_id, referencia_tipo="comanda"))
     db.commit()
+    broadcast("comanda_cerrada", {"comanda_id": comanda_id, "numero_mesa": numero_mesa, "total": total_final})
     return {
         "ok": True,
         "subtotal": subtotal,
@@ -328,23 +344,26 @@ def cobrar(comanda_id: int, data: PagoIn, db: Session = Depends(get_db), _=Depen
 
 
 @router.post("/{comanda_id}/cancelar")
-def cancelar(comanda_id: int, db: Session = Depends(get_db), _=Depends(require_auth)):
+def cancelar(comanda_id: int, db: Session = Depends(get_db), auth=Depends(require_auth)):
     c = db.query(Comanda).options(joinedload(Comanda.mesa)).filter(
         Comanda.id == comanda_id, Comanda.estado == "abierta"
     ).first()
     if not c:
         raise HTTPException(404, "Comanda no encontrada o ya cerrada")
+    numero_mesa = c.mesa.numero if c.mesa else 0
     c.estado = "cancelada"
     c.closed_at = datetime.utcnow()
     if c.mesa:
         c.mesa.estado = "libre"
+    db.add(AuditLog(accion="cancelar_comanda", detalle=f"Comanda #{comanda_id} (Mesa {numero_mesa}) cancelada", usuario_rol=auth["role"], referencia_id=comanda_id, referencia_tipo="comanda"))
     db.commit()
+    broadcast("comanda_cerrada", {"comanda_id": comanda_id, "numero_mesa": numero_mesa})
     return {"ok": True}
 
 
 @router.patch("/{comanda_id}/items/{item_id}", response_model=ComandaOut)
 def cambiar_cantidad(comanda_id: int, item_id: int, data: CantidadIn,
-                     db: Session = Depends(get_db), _=Depends(require_auth)):
+                     db: Session = Depends(get_db), auth=Depends(require_auth)):
     """Cambia la cantidad de un item (mínimo 1). Si llega a 0 lo elimina."""
     c = db.query(Comanda).filter(Comanda.id == comanda_id, Comanda.estado == "abierta").first()
     if not c:
@@ -365,15 +384,17 @@ def cambiar_cantidad(comanda_id: int, item_id: int, data: CantidadIn,
     ).scalar() or 0.0
     db.commit()
 
-    return _build_comanda_out(db.query(Comanda).options(
+    out = _build_comanda_out(db.query(Comanda).options(
         joinedload(Comanda.mesa),
         joinedload(Comanda.items).joinedload(ItemComanda.producto)
     ).filter(Comanda.id == comanda_id).first())
+    broadcast("comanda_update", {"comanda_id": comanda_id, "numero_mesa": out.numero_mesa})
+    return out
 
 
 @router.post("/{comanda_id}/items/{item_id}/listo", response_model=ComandaOut)
 def toggle_item_listo(comanda_id: int, item_id: int,
-                      db: Session = Depends(get_db), _=Depends(require_auth)):
+                      db: Session = Depends(get_db), auth=Depends(require_auth)):
     """Cocina marca/desmarca un item como preparado."""
     item = db.query(ItemComanda).filter(
         ItemComanda.id == item_id, ItemComanda.comanda_id == comanda_id
@@ -383,14 +404,17 @@ def toggle_item_listo(comanda_id: int, item_id: int,
     item.listo = not item.listo
     db.commit()
 
-    return _build_comanda_out(db.query(Comanda).options(
+    out = _build_comanda_out(db.query(Comanda).options(
         joinedload(Comanda.mesa),
         joinedload(Comanda.items).joinedload(ItemComanda.producto)
     ).filter(Comanda.id == comanda_id).first())
+    event = "lista_para_servir" if out.lista_para_servir else "comanda_update"
+    broadcast(event, {"comanda_id": comanda_id, "numero_mesa": out.numero_mesa})
+    return out
 
 
 @router.post("/{comanda_id}/todo-listo", response_model=ComandaOut)
-def todo_listo(comanda_id: int, db: Session = Depends(get_db), _=Depends(require_auth)):
+def todo_listo(comanda_id: int, db: Session = Depends(get_db), auth=Depends(require_auth)):
     """Cocina marca todos los ítems de la comanda como preparados de una vez."""
     items = db.query(ItemComanda).filter(ItemComanda.comanda_id == comanda_id).all()
     if not items:
@@ -398,10 +422,12 @@ def todo_listo(comanda_id: int, db: Session = Depends(get_db), _=Depends(require
     for item in items:
         item.listo = True
     db.commit()
-    return _build_comanda_out(db.query(Comanda).options(
+    out = _build_comanda_out(db.query(Comanda).options(
         joinedload(Comanda.mesa),
         joinedload(Comanda.items).joinedload(ItemComanda.producto)
     ).filter(Comanda.id == comanda_id).first())
+    broadcast("lista_para_servir", {"comanda_id": comanda_id, "numero_mesa": out.numero_mesa})
+    return out
 
 
 @router.post("/{comanda_id}/pedir-cuenta", response_model=ComandaOut)

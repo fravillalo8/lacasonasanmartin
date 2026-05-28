@@ -22,6 +22,7 @@ import Configuracion from './Configuracion'
 import Proveedores from './Proveedores'
 import Cotizador from './Cotizador'
 import Manual from './Manual'
+import Auditoria from './Auditoria'
 
 export type Role = 'admin' | 'mozo' | 'cocina'
 
@@ -105,6 +106,7 @@ export default function InventarioApp() {
                     <Route path="reportes" element={<RoleGuard allow={['admin']}><Reportes /></RoleGuard>} />
                     <Route path="proveedores" element={<RoleGuard allow={['admin']}><Proveedores /></RoleGuard>} />
                     <Route path="cotizador" element={<RoleGuard allow={['admin']}><Cotizador /></RoleGuard>} />
+                    <Route path="auditoria" element={<RoleGuard allow={['admin']}><Auditoria /></RoleGuard>} />
                     <Route path="config" element={<RoleGuard allow={['admin']}><Configuracion /></RoleGuard>} />
                     <Route path="manual" element={<Manual />} />
                     <Route path="*" element={<Navigate to="/mesa-central" replace />} />

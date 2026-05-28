@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from './api/client'
 import type { DashboardData } from './api/client'
-import { AlertTriangle, ChefHat, TrendingUp, ShoppingCart, CheckCircle, Clock, Banknote, Receipt } from 'lucide-react'
+import { AlertTriangle, ChefHat, TrendingUp, ShoppingCart, CheckCircle, Clock, Banknote, Receipt, Flame } from 'lucide-react'
 
 function StatCard({
   label,
@@ -123,6 +123,35 @@ export default function Dashboard() {
           color="bg-orange-100 text-orange-600"
         />
       </div>
+
+      {/* Top platos de hoy */}
+      {data.top_hoy && data.top_hoy.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-stone-100">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-stone-100">
+            <Flame size={16} className="text-amber-500" />
+            <h2 className="font-semibold text-stone-700">Más pedidos hoy</h2>
+          </div>
+          <div className="divide-y divide-stone-50">
+            {data.top_hoy.map((p, i) => {
+              const max = data.top_hoy[0].cantidad
+              return (
+                <div key={p.nombre} className="flex items-center gap-3 px-5 py-3">
+                  <span className={`text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                    i === 0 ? 'bg-amber-100 text-amber-700' : i === 1 ? 'bg-stone-200 text-stone-600' : 'bg-orange-50 text-orange-500'
+                  }`}>{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-stone-700 truncate">{p.nombre}</p>
+                    <div className="mt-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-amber-400 rounded-full" style={{ width: `${(p.cantidad / max) * 100}%` }} />
+                    </div>
+                  </div>
+                  <span className="text-sm font-bold text-stone-700 shrink-0">{p.cantidad}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Últimas compras */}
       <div className="bg-white rounded-2xl shadow-sm border border-stone-100">

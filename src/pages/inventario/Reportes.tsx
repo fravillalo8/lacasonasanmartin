@@ -1,6 +1,24 @@
 import { useEffect, useState } from 'react'
 import { api } from './api/client'
 import type { CostoReceta, Movimiento, ComprasMes, TopProducto, HorariosPico, PYLMes } from './api/client'
+import { Download } from 'lucide-react'
+
+const BASE = import.meta.env.VITE_API_URL ?? ''
+
+function csvUrl(path: string, params: Record<string, string | number>) {
+  const token = localStorage.getItem('inv_token') || ''
+  const qs = new URLSearchParams({ ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])), token }).toString()
+  return `${BASE}/api/reportes/${path}/csv?${qs}`
+}
+
+function CsvBtn({ href }: { href: string }) {
+  return (
+    <a href={href} download className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-medium transition-colors border border-emerald-200">
+      <Download size={13} />
+      Exportar CSV
+    </a>
+  )
+}
 
 function clp(n: number) {
   return `$${Math.round(n).toLocaleString('es-CL')}`
@@ -79,13 +97,14 @@ export default function Reportes() {
       {/* ── Top ventas ─────────────────────────────────────────────────────── */}
       {tab === 'top' && !loading && (
         <div className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {[7, 30, 90].map(d => (
-              <button key={d} onClick={() => setDias(d)}
+              <button key={d} onClick={() => setDias(d)} type="button"
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${dias === d ? 'bg-amber-500 text-stone-900' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>
                 {d} días
               </button>
             ))}
+            <div className="ml-auto"><CsvBtn href={csvUrl('top-productos', { dias })} /></div>
           </div>
           <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
             {topProductos.length === 0 ? (
@@ -138,6 +157,7 @@ export default function Reportes() {
       {/* ── P&L mensual ────────────────────────────────────────────────────── */}
       {tab === 'pyl' && !loading && (
         <div className="space-y-4">
+          <div className="flex justify-end"><CsvBtn href={csvUrl('pyl', { meses: 3 })} /></div>
           {pyl.length === 0 ? (
             <p className="text-stone-400 text-sm text-center py-12">Sin datos suficientes.</p>
           ) : (
@@ -190,9 +210,9 @@ export default function Reportes() {
       {/* ── Horarios pico ──────────────────────────────────────────────────── */}
       {tab === 'horarios' && !loading && (
         <div className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {[7, 30, 90].map(d => (
-              <button key={d} onClick={() => setDias(d)}
+              <button key={d} onClick={() => setDias(d)} type="button"
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${dias === d ? 'bg-amber-500 text-stone-900' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>
                 {d} días
               </button>
@@ -291,13 +311,14 @@ export default function Reportes() {
       {/* ── Movimientos de stock ───────────────────────────────────────────── */}
       {tab === 'movimientos' && !loading && (
         <div className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {[7, 30, 60, 90].map(d => (
-              <button key={d} onClick={() => setDias(d)}
+              <button key={d} onClick={() => setDias(d)} type="button"
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${dias === d ? 'bg-amber-500 text-stone-900' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>
                 {d} días
               </button>
             ))}
+            <div className="ml-auto"><CsvBtn href={csvUrl('ventas', { dias })} /></div>
           </div>
           <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
             {movimientos.length === 0 ? (

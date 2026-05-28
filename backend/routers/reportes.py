@@ -1,10 +1,13 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
-from models import Ingrediente, Compra, MovimientoStock, Receta, ItemReceta, Venta, ItemComanda, Producto, GastoDia, Merma
-from routers.auth import require_auth
+from models import Ingrediente, Compra, MovimientoStock, Receta, ItemReceta, Venta, ItemComanda, Producto, GastoDia, Merma, Comanda
+from routers.auth import require_auth, require_admin
+import csv
+import io
 
 router = APIRouter(prefix="/api/reportes", tags=["reportes"])
 
@@ -53,6 +56,29 @@ def dashboard(db: Session = Depends(get_db), _=Depends(require_auth)):
     ventas_mes = db.query(func.sum(Venta.total)).filter(Venta.created_at >= inicio_mes).scalar() or 0
     num_ventas_mes = db.query(Venta).filter(Venta.created_at >= inicio_mes).count()
 
+    # Top 3 productos del día (comandas cerradas hoy)
+    top_hoy = (
+        db.query(
+            ItemComanda.producto_id,
+            func.sum(ItemComanda.cantidad).label("qty"),
+        )
+        .join(ItemComanda.comanda)
+        .filter(
+            Comanda.estado == "cerrada",
+            Comanda.created_at >= inicio_hoy,
+        )
+        .group_by(ItemComanda.producto_id)
+        .order_by(func.sum(ItemComanda.cantidad).desc())
+        .limit(3)
+        .all()
+    )
+
+    top_hoy_data = []
+    for row in top_hoy:
+        prod = db.query(Producto).filter(Producto.id == row.producto_id).first()
+        if prod:
+            top_hoy_data.append({"nombre": prod.nombre, "cantidad": int(row.qty)})
+
     return {
         "total_ingredientes": total_ingredientes,
         "alertas_stock": alertas_stock,
@@ -64,6 +90,7 @@ def dashboard(db: Session = Depends(get_db), _=Depends(require_auth)):
         "num_ventas_hoy": num_ventas_hoy,
         "ventas_mes": round(ventas_mes, 0),
         "num_ventas_mes": num_ventas_mes,
+        "top_hoy": top_hoy_data,
         "ultimas_compras": [
             {
                 "id": c.id,
@@ -279,3 +306,128 @@ def pyl_mensual(
             "resultado": round(ingresos - egresos, 0),
         })
     return resultado
+
+
+# ─── CSV Exports ─────────────────────────────────────────────────────────────
+
+@router.get("/top-productos/csv")
+def top_productos_csv(
+    dias: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    items = (
+        db.query(
+            ItemComanda.producto_id,
+            func.sum(ItemComanda.cantidad).label("total_cantidad"),
+            func.sum(ItemComanda.subtotal).label("total_ingresos"),
+        )
+        .join(ItemComanda.comanda)
+        .filter(ItemComanda.comanda.has(estado="cerrada"))
+        .group_by(ItemComanda.producto_id)
+        .order_by(func.sum(ItemComanda.cantidad).desc())
+        .all()
+    )
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["Producto", "Categoría", "Unidades vendidas", "Ingresos CLP"])
+    for row in items:
+        prod = db.query(Producto).filter(Producto.id == row.producto_id).first()
+        writer.writerow([
+            prod.nombre if prod else "",
+            prod.categoria if prod else "",
+            int(row.total_cantidad),
+            round(float(row.total_ingresos), 0),
+        ])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=top-productos-{dias}dias.csv"},
+    )
+
+
+@router.get("/pyl/csv")
+def pyl_csv(
+    meses: int = Query(3, ge=1, le=12),
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    # Reutiliza la lógica del endpoint P&L
+    desde = datetime.utcnow() - timedelta(days=meses * 31)
+    ventas = db.query(Venta).filter(Venta.created_at >= desde).all()
+    compras = db.query(Compra).filter(Compra.fecha >= desde).all()
+    gastos = db.query(GastoDia).filter(GastoDia.fecha >= desde).all()
+    mermas = db.query(Merma).filter(Merma.created_at >= desde).all()
+
+    resumen: dict = {}
+    for v in ventas:
+        if v.created_at:
+            k = v.created_at.strftime("%Y-%m")
+            resumen.setdefault(k, {"ingresos": 0, "compras": 0, "gastos": 0, "mermas": 0})
+            resumen[k]["ingresos"] += v.total
+    for c in compras:
+        if c.fecha:
+            k = c.fecha.strftime("%Y-%m")
+            resumen.setdefault(k, {"ingresos": 0, "compras": 0, "gastos": 0, "mermas": 0})
+            resumen[k]["compras"] += c.monto_total
+    for g in gastos:
+        if g.fecha:
+            k = g.fecha.strftime("%Y-%m")
+            resumen.setdefault(k, {"ingresos": 0, "compras": 0, "gastos": 0, "mermas": 0})
+            resumen[k]["gastos"] += g.monto
+    for m in mermas:
+        if m.created_at:
+            k = m.created_at.strftime("%Y-%m")
+            resumen.setdefault(k, {"ingresos": 0, "compras": 0, "gastos": 0, "mermas": 0})
+            resumen[k]["mermas"] += m.costo_estimado
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["Mes", "Ingresos", "Compras", "Gastos", "Mermas", "Egresos", "Resultado"])
+    for mes, data in sorted(resumen.items()):
+        egresos = data["compras"] + data["gastos"] + data["mermas"]
+        writer.writerow([
+            mes,
+            round(data["ingresos"], 0),
+            round(data["compras"], 0),
+            round(data["gastos"], 0),
+            round(data["mermas"], 0),
+            round(egresos, 0),
+            round(data["ingresos"] - egresos, 0),
+        ])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=pyl-{meses}meses.csv"},
+    )
+
+
+@router.get("/ventas/csv")
+def ventas_csv(
+    dias: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    desde = datetime.utcnow() - timedelta(days=dias)
+    ventas = db.query(Venta).filter(Venta.created_at >= desde).order_by(Venta.created_at.desc()).all()
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["Fecha", "Mesa", "Subtotal", "Descuento", "Propina", "Total", "Tipo pago"])
+    for v in ventas:
+        writer.writerow([
+            v.created_at.strftime("%d/%m/%Y %H:%M") if v.created_at else "",
+            v.numero_mesa or "",
+            round(v.subtotal or 0, 0),
+            round(v.descuento or 0, 0),
+            round(v.propina or 0, 0),
+            round(v.total or 0, 0),
+            v.tipo_pago or "",
+        ])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=ventas-{dias}dias.csv"},
+    )

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { api, OfflineEnqueuedError, syncQueue } from './api/client'
 import type { Mesa, MesaIn, Comanda, ItemComanda, Producto, PagoOut, MPDevice } from './api/client'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import { useSSE } from '../../hooks/useSSE'
 import {
   Plus, X, Trash2, Settings, Users, ChevronRight, Minus, Clock, FileText, PenLine,
   CreditCard, Banknote, Smartphone, ArrowLeftRight, Check, Printer, Percent, ShoppingBag,
@@ -951,6 +952,7 @@ export default function Mesas() {
 
   useEffect(() => {
     reload()
+    // Polling de respaldo cada 45s — SSE es la vía principal
     const interval = setInterval(async () => {
       try {
         const [m, cas] = await Promise.all([
@@ -961,9 +963,20 @@ export default function Mesas() {
         setComandasActivas(cas)
         detectarListas(cas)
       } catch { }
-    }, 20000)
+    }, 45000)
     return () => clearInterval(interval)
   }, [])
+
+  // SSE: actualización instantánea en eventos de comanda
+  useSSE((type) => {
+    if (type === 'comanda_nueva' || type === 'comanda_update' || type === 'comanda_cerrada' || type === 'lista_para_servir') {
+      api.mesas.list().then(setMesas).catch(() => {})
+      api.comandas.activos().then(cas => {
+        setComandasActivas(cas)
+        detectarListas(cas)
+      }).catch(() => {})
+    }
+  })
 
   // Sync pendientes al reconectar y refrescar mesas
   useEffect(() => {

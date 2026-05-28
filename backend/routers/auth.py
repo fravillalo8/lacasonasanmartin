@@ -88,3 +88,11 @@ def require_admin(auth: dict = Depends(require_auth)) -> dict:
     if auth["role"] != "admin":
         raise HTTPException(status_code=403, detail="Se requiere rol administrador")
     return auth
+
+
+def verify_token(token: str) -> dict:
+    """Verifica token directamente (para SSE que no puede usar headers)."""
+    entry = _tokens.get(token)
+    if not entry or entry["expires"] < time.time():
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+    return {"token": token, "role": entry["role"]}

@@ -97,14 +97,17 @@ def _build_comanda_out(c: Comanda) -> ComandaOut:
 
 def _asignar_ticket(db: Session) -> int:
     """Genera el número de ticket correlativo del día (reinicia cada día)."""
-    inicio_hoy = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    ultimo = (
-        db.query(Comanda.numero_ticket)
-        .filter(Comanda.created_at >= inicio_hoy, Comanda.numero_ticket.isnot(None))
-        .order_by(Comanda.numero_ticket.desc())
-        .first()
-    )
-    return (ultimo[0] + 1) if ultimo else 1
+    try:
+        inicio_hoy = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        ultimo = (
+            db.query(Comanda.numero_ticket)
+            .filter(Comanda.created_at >= inicio_hoy, Comanda.numero_ticket.isnot(None))
+            .order_by(Comanda.numero_ticket.desc())
+            .first()
+        )
+        return (ultimo[0] + 1) if ultimo else 1
+    except Exception:
+        return 1
 
 
 @router.post("/abrir/{mesa_id}", response_model=ComandaOut)

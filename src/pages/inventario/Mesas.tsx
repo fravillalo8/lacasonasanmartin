@@ -463,6 +463,39 @@ ${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoRe
     mp: <span className="text-sky-500 font-black text-[11px]">MP</span>,
   }
 
+  if (!loading && err && !comanda) {
+    return (
+      <div className="fixed inset-0 z-50 flex">
+        <div className="flex-1 bg-black/40" onClick={onClose} />
+        <div className="w-full max-w-2xl bg-white flex flex-col items-center justify-center gap-4 shadow-2xl p-8 text-center">
+          <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
+            <X size={28} className="text-red-500" />
+          </div>
+          <div>
+            <p className="font-bold text-stone-800 text-lg">Error al abrir la comanda</p>
+            <p className="text-red-500 text-sm mt-1">{err}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => { setErr(''); load() }}
+              className="bg-amber-500 hover:bg-amber-400 text-stone-900 font-semibold px-6 py-2.5 rounded-xl text-sm"
+            >
+              Reintentar
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="border border-stone-200 text-stone-600 px-6 py-2.5 rounded-xl text-sm hover:bg-stone-50"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (pagoResult) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">

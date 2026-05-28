@@ -198,23 +198,26 @@ export default function Cocina() {
 
   const reload = useCallback(async () => {
     try {
-      const [data, hist] = await Promise.all([
-        api.comandas.cocina(),
-        api.comandas.historialCocina(),
-      ])
+      const data = await api.comandas.cocina()
       const newIds = new Set(data.map(c => c.id))
       if (prevIdsRef.current.size > 0 && data.some(c => !prevIdsRef.current.has(c.id))) {
         playBeep()
       }
       prevIdsRef.current = newIds
       setComandas(data)
-      setHistorial(hist)
       setLastUpdate(new Date())
       setFetchErr('')
     } catch (e: unknown) {
       setFetchErr(e instanceof Error ? e.message : 'Error al conectar con el servidor')
     } finally {
       setLoading(false)
+    }
+    // Historial es opcional — si falla no rompe la vista principal
+    try {
+      const hist = await api.comandas.historialCocina()
+      setHistorial(hist)
+    } catch {
+      // no-op
     }
   }, [])
 

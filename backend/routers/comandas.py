@@ -141,6 +141,20 @@ def vista_cocina(db: Session = Depends(get_db), _=Depends(require_auth)):
     return [_build_comanda_out(c) for c in comandas]
 
 
+@router.get("/historial-cocina")
+def historial_cocina(db: Session = Depends(get_db), _=Depends(require_auth)):
+    """Comandas del día de hoy (abiertas ya listas + cerradas) para historial de cocina."""
+    inicio_hoy = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    comandas = (
+        db.query(Comanda)
+        .options(joinedload(Comanda.mesa), joinedload(Comanda.items).joinedload(ItemComanda.producto))
+        .filter(Comanda.created_at >= inicio_hoy)
+        .order_by(Comanda.created_at.desc())
+        .all()
+    )
+    return [_build_comanda_out(c) for c in comandas]
+
+
 @router.post("/delivery", response_model=ComandaOut)
 def abrir_delivery(data: DeliveryIn, db: Session = Depends(get_db), _=Depends(require_auth)):
     c = Comanda(tipo="delivery", cliente_nombre=data.cliente_nombre, numero_ticket=_asignar_ticket(db))

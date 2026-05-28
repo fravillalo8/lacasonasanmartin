@@ -185,6 +185,7 @@ export const api = {
       request<Comanda>(`/comandas/${id}/items/${item_id}/listo`, { method: 'POST' }),
     todoListo: (id: number) =>
       request<Comanda>(`/comandas/${id}/todo-listo`, { method: 'POST' }),
+    historialCocina: () => request<Comanda[]>('/comandas/historial-cocina'),
     pedirCuenta: (id: number) =>
       request<Comanda>(`/comandas/${id}/pedir-cuenta`, { method: 'POST' }),
   },

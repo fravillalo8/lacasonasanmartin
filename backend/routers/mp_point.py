@@ -1,7 +1,7 @@
 import os
 import requests as http
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from routers.auth import require_auth
 
 router = APIRouter(prefix="/api/mp-point", tags=["mp-point"])
@@ -18,7 +18,7 @@ def _hdrs() -> dict:
 
 class IntentIn(BaseModel):
     device_id: str
-    amount: int          # pesos CLP enteros
+    amount: int = Field(..., gt=0, description="Monto en pesos CLP — debe ser mayor a 0")
     description: str = "Pago en mesa"
 
 

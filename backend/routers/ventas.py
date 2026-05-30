@@ -76,12 +76,15 @@ def resumen(db: Session = Depends(get_db), _=Depends(require_auth)):
     inicio_mes = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     def _stats(desde: datetime):
-        rows = db.query(Venta).filter(Venta.created_at >= desde).all()
-        total = sum(v.total for v in rows)
-        count = len(rows)
-        por_pago: dict[str, float] = {}
-        for v in rows:
-            por_pago[v.tipo_pago] = por_pago.get(v.tipo_pago, 0) + v.total
+        total = db.query(func.sum(Venta.total)).filter(Venta.created_at >= desde).scalar() or 0
+        count = db.query(func.count(Venta.id)).filter(Venta.created_at >= desde).scalar() or 0
+        rows_pago = (
+            db.query(Venta.tipo_pago, func.sum(Venta.total))
+            .filter(Venta.created_at >= desde)
+            .group_by(Venta.tipo_pago)
+            .all()
+        )
+        por_pago = {tp: round(s, 0) for tp, s in rows_pago if tp}
         return {"total": round(total, 0), "count": count, "por_pago": por_pago}
 
     return {

@@ -641,41 +641,61 @@ function ComandaPanel({
     ? `Para llevar — ${deliveryComanda.cliente_nombre}`
     : mesa ? `Mesa ${mesa.numero}${mesa.nombre ? ` · ${mesa.nombre}` : ''}` : ''
 
+  function _esc(s: string): string {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                    .replace(/"/g,'&quot;').replace(/'/g,'&#39;')
+  }
+
   function printReceipt() {
     if (!comanda || !pagoResult) return
     const now = new Date().toLocaleString('es-CL')
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>Boleta ${panelTitle}</title>
-<style>
-  body { font-family: monospace; font-size: 13px; max-width: 320px; margin: 0 auto; padding: 16px; }
-  h2 { text-align: center; margin: 0 0 4px; font-size: 16px; }
-  .center { text-align: center; }
-  .divider { border-top: 1px dashed #999; margin: 8px 0; }
-  .row { display: flex; justify-content: space-between; margin: 2px 0; }
-  .total { font-weight: bold; font-size: 15px; }
-  @media print { button { display: none; } }
-</style></head><body>
-<h2>La Casona San Martín</h2>
-<p class="center" style="margin:0;color:#666">MesaControl</p>
-<div class="divider"></div>
-<div class="row"><span>${panelTitle}</span><span>${now}</span></div>
-<div class="divider"></div>
-${comanda.items.map(it =>
-  `<div class="row"><span>${it.cantidad}× ${it.nombre_producto}</span><span>${it.subtotal.toLocaleString('es-CL')}</span></div>`
-).join('')}
-<div class="divider"></div>
-<div class="row"><span>Subtotal</span><span>${pagoResult.subtotal.toLocaleString('es-CL')}</span></div>
-${pagoResult.descuento > 0 ? `<div class="row"><span>Descuento (${descPct}%)</span><span>-${pagoResult.descuento.toLocaleString('es-CL')}</span></div>` : ''}
-${pagoResult.propina > 0 ? `<div class="row"><span>Propina</span><span>+${pagoResult.propina.toLocaleString('es-CL')}</span></div>` : ''}
-<div class="row total"><span>TOTAL</span><span>$${pagoResult.total.toLocaleString('es-CL')}</span></div>
-<div class="row"><span>Pago 1: ${tipoPago}</span>${tipoPago === 'efectivo' ? `<span>Vuelto: $${pagoResult.vuelto.toLocaleString('es-CL')}</span>` : ''}</div>
-${(pagoResult.pago2_tipo) ? `<div class="row"><span>Pago 2: ${pagoResult.pago2_tipo}</span><span>$${(pagoResult.pago2_monto ?? 0).toLocaleString('es-CL')}</span></div>` : ''}
-<div class="divider"></div>
-<p class="center">¡Gracias por su visita!</p>
-<br><button onclick="window.print()">Imprimir</button>
-</body></html>`
-    const w = window.open('', '_blank', 'width=400,height=600')
-    if (w) { w.document.write(html); w.document.close() }
+    const itemsHtml = comanda.items.map(it =>
+      `<div class="row"><span>${it.cantidad}× ${_esc(it.nombre_producto)}</span><span>${it.subtotal.toLocaleString('es-CL')}</span></div>`
+    ).join('')
+    const descHtml = pagoResult.descuento > 0
+      ? `<div class="row"><span>Descuento (${descPct}%)</span><span>-${pagoResult.descuento.toLocaleString('es-CL')}</span></div>`
+      : ''
+    const propinaHtml = pagoResult.propina > 0
+      ? `<div class="row"><span>Propina</span><span>+${pagoResult.propina.toLocaleString('es-CL')}</span></div>`
+      : ''
+    const pago2Html = pagoResult.pago2_tipo
+      ? `<div class="row"><span>Pago 2: ${_esc(pagoResult.pago2_tipo)}</span><span>$${(pagoResult.pago2_monto ?? 0).toLocaleString('es-CL')}</span></div>`
+      : ''
+    const vueltoHtml = tipoPago === 'efectivo'
+      ? `<span>Vuelto: $${pagoResult.vuelto.toLocaleString('es-CL')}</span>`
+      : ''
+    const html = [
+      '<!DOCTYPE html><html><head><meta charset="UTF-8">',
+      `<title>Boleta ${_esc(panelTitle)}</title>`,
+      '<style>',
+      'body{font-family:monospace;font-size:13px;max-width:320px;margin:0 auto;padding:16px}',
+      'h2{text-align:center;margin:0 0 4px;font-size:16px}',
+      '.center{text-align:center}.divider{border-top:1px dashed #999;margin:8px 0}',
+      '.row{display:flex;justify-content:space-between;margin:2px 0}',
+      '.total{font-weight:bold;font-size:15px}',
+      '@media print{button{display:none}}',
+      '</style></head><body>',
+      '<h2>La Casona San Martín</h2>',
+      '<p class="center" style="margin:0;color:#666">MesaControl</p>',
+      '<div class="divider"></div>',
+      `<div class="row"><span>${_esc(panelTitle)}</span><span>${_esc(now)}</span></div>`,
+      '<div class="divider"></div>',
+      itemsHtml,
+      '<div class="divider"></div>',
+      `<div class="row"><span>Subtotal</span><span>${pagoResult.subtotal.toLocaleString('es-CL')}</span></div>`,
+      descHtml, propinaHtml,
+      `<div class="row total"><span>TOTAL</span><span>$${pagoResult.total.toLocaleString('es-CL')}</span></div>`,
+      `<div class="row"><span>Pago 1: ${_esc(tipoPago)}</span>${vueltoHtml}</div>`,
+      pago2Html,
+      '<div class="divider"></div>',
+      '<p class="center">¡Gracias por su visita!</p>',
+      '<br><button type="button" onclick="window.print()">Imprimir</button>',
+      '</body></html>',
+    ].join('')
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const w = window.open(url, '_blank', 'width=400,height=600')
+    if (w) w.addEventListener('unload', () => URL.revokeObjectURL(url))
   }
 
   const categorias = Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)))

@@ -34,6 +34,11 @@ backend/inventario.db
 # Sensitive files with API keys
 public/chat.php
 
+# Frontend env con URLs/secretos de producción (documentar en .env.production.example)
+.env.production
+.env.local
+.env.*.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

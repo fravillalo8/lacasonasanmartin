@@ -10,8 +10,8 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Ingrediente, Proveedor, PrecioProveedor
-from routers.auth import require_admin
+from models import Ingrediente, Proveedor, PrecioProveedor, MovimientoStock
+from routers.auth import require_admin, require_heavy_ratelimit
 
 router = APIRouter(prefix="/api/cotizador", tags=["cotizador"])
 
@@ -33,7 +33,8 @@ def comparar(db: Session = Depends(get_db), _=Depends(require_admin)):
 
     pp_map = _build_precio_map(db)
     precio_map = {k: v.precio for k, v in pp_map.items()}
-    fecha_map = {k: v.fecha for k, v in pp_map.items()}
+    fecha_map  = {k: v.fecha  for k, v in pp_map.items()}
+    notas_map  = {k: v.notas  for k, v in pp_map.items()}
 
     ahora = datetime.now(timezone.utc)
     stale_cutoff = ahora - timedelta(days=STALE_DAYS)
@@ -41,13 +42,16 @@ def comparar(db: Session = Depends(get_db), _=Depends(require_admin)):
     rows = []
     for ing in ingredientes:
         precios_ing: dict[int, float | None] = {}
-        fechas_ing: dict[int, str | None] = {}
+        fechas_ing:  dict[int, str | None]   = {}
+        notas_ing:   dict[int, str | None]   = {}
         valores = []
         for prov in proveedores:
             p = precio_map.get((ing.id, prov.id))
             f = fecha_map.get((ing.id, prov.id))
+            n = notas_map.get((ing.id, prov.id))
             precios_ing[prov.id] = p
-            fechas_ing[prov.id] = f.isoformat() if f else None
+            fechas_ing[prov.id]  = f.isoformat() if f else None
+            notas_ing[prov.id]   = n or None
             if p is not None and p > 0:
                 valores.append(p)
 
@@ -59,7 +63,8 @@ def comparar(db: Session = Depends(get_db), _=Depends(require_admin)):
             "stock_actual": ing.stock,
             "costo_actual": ing.costo_unitario,
             "precios": precios_ing,
-            "fechas": fechas_ing,
+            "fechas":  fechas_ing,
+            "notas":   notas_ing,
             "min_precio": min_precio,
             "mejor_proveedor_id": (
                 next((prov.id for prov in proveedores if precio_map.get((ing.id, prov.id)) == min_precio), None)
@@ -186,123 +191,195 @@ def pedido_optimo(body: dict, db: Session = Depends(get_db), _=Depends(require_a
     }
 
 
-# ─── Scraper Jumbo (VTEX) ────────────────────────────────────────────────────
-
-JUMBO_SEARCH = "https://www.jumbo.cl/api/catalog_system/pub/products/search"
-UNIMARC_SEARCH = "https://www.unimarc.cl/api/catalog_system/pub/products/search"
+# ─── Scrapers supermercados ───────────────────────────────────────────────────
 
 SCRAPER_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-    "Accept": "application/json",
+    "Accept": "application/json, text/html, */*",
 }
 
-def _vtex_search(base_url: str, query: str) -> float | None:
-    """Busca un producto en una tienda VTEX y retorna el precio más bajo encontrado."""
+# Cadenas que usan plataforma VTEX  → keyword en nombre del proveedor: URL base de búsqueda
+VTEX_STORES: dict[str, str] = {
+    "jumbo":         "https://www.jumbo.cl/api/catalog_system/pub/products/search",
+    "santa isabel":  "https://www.santaisabel.cl/api/catalog_system/pub/products/search",
+    "unimarc":       "https://www.unimarc.cl/api/catalog_system/pub/products/search",
+    "acuenta":       "https://www.acuenta.cl/api/catalog_system/pub/products/search",
+}
+
+# Lider / Walmart Chile: plataforma propia (Next.js + Algolia)
+LIDER_KEYWORDS = {"lider", "líder", "walmart"}
+
+
+def _vtex_search(base_url: str, query: str) -> dict | None:
+    """Retorna {"precio": X, "producto": "nombre encontrado"} con el precio más bajo en VTEX."""
     try:
         resp = http_requests.get(
             base_url,
-            params={"ft": query, "_from": 0, "_to": 3},
+            params={"ft": query, "_from": 0, "_to": 4},
             headers=SCRAPER_HEADERS,
-            timeout=8,
+            timeout=10,
         )
         if not resp.ok:
             return None
-        productos = resp.json()
-        precios = []
-        for prod in productos:
+        best_precio: float | None = None
+        best_nombre = ""
+        for prod in resp.json():
+            nombre_prod = prod.get("productName", "")
             for sku in prod.get("items", []):
                 for seller in sku.get("sellers", []):
                     p = seller.get("commertialOffer", {}).get("Price", 0)
                     if p and p > 0:
-                        precios.append(p)
-        return min(precios) if precios else None
+                        if best_precio is None or p < best_precio:
+                            best_precio = p
+                            best_nombre = nombre_prod or sku.get("name", "")
+        if best_precio is None:
+            return None
+        return {"precio": best_precio, "producto": best_nombre[:80]}
     except Exception:
         return None
 
 
-def _unimarc_search(query: str) -> float | None:
-    """Intenta VTEX primero, cae a scraping HTML si falla."""
-    precio = _vtex_search(UNIMARC_SEARCH, query)
-    if precio:
-        return precio
-    # Fallback HTML
+def _lider_search(query: str) -> dict | None:
+    """Busca en Líder.cl (Walmart Chile). Intenta JSON API, luego __NEXT_DATA__, luego regex HTML."""
+    encoded = http_requests.utils.quote(query)
+
+    # 1) Intentar endpoint REST de Algolia que usa lider.cl
     try:
         resp = http_requests.get(
-            "https://www.unimarc.cl/search",
-            params={"q": query},
+            "https://www.lider.cl/supermercado/api/search",
+            params={"q": query, "hitsPerPage": 5, "page": 0},
+            headers=SCRAPER_HEADERS,
+            timeout=10,
+        )
+        if resp.ok:
+            data = resp.json()
+            hits = data.get("hits") or data.get("results", [{}])[0].get("hits", [])
+            best = None
+            for h in hits:
+                p = h.get("price") or h.get("offerPrice") or h.get("priceRange", {}).get("offerPrice", 0)
+                if isinstance(p, (int, float)) and p > 0:
+                    if best is None or p < best["precio"]:
+                        best = {"precio": float(p), "producto": (h.get("name") or h.get("title") or "")[:80]}
+            if best:
+                return best
+    except Exception:
+        pass
+
+    # 2) Intentar VTEX (Líder tenía VTEX en el pasado)
+    vtex = _vtex_search("https://www.lider.cl/api/catalog_system/pub/products/search", query)
+    if vtex:
+        return vtex
+
+    # 3) HTML scraping con __NEXT_DATA__ y regex de respaldo
+    try:
+        resp = http_requests.get(
+            f"https://www.lider.cl/supermercado/search?q={encoded}",
             headers={**SCRAPER_HEADERS, "Accept": "text/html"},
-            timeout=8,
+            timeout=12,
         )
         if not resp.ok:
             return None
-        soup = BeautifulSoup(resp.text, "lxml")
+        html = resp.text
+
+        # Buscar en __NEXT_DATA__
+        match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(\{.*?\})</script>', html, re.DOTALL)
+        if match:
+            try:
+                ndata = json.loads(match.group(1))
+                text_ndata = json.dumps(ndata)
+                price_matches = re.findall(r'"(?:price|offerPrice|listPrice)"\s*:\s*(\d+(?:\.\d+)?)', text_ndata)
+                precios = [float(p) for p in price_matches if float(p) > 100]
+                if precios:
+                    return {"precio": min(precios), "producto": ""}
+            except Exception:
+                pass
+
+        # Regex de último recurso
+        soup = BeautifulSoup(html, "lxml")
         prices = []
-        for el in soup.select("[class*='price'], [class*='Price'], [class*='precio']"):
+        for el in soup.select("[class*='price'], [class*='Price'], [class*='precio'], [data-testid*='price']"):
             text = re.sub(r"[^\d]", "", el.get_text())
-            if text and len(text) >= 3:
+            if text and 3 <= len(text) <= 6:
                 prices.append(int(text))
-        return min(prices) if prices else None
+        return {"precio": min(prices), "producto": ""} if prices else None
     except Exception:
         return None
 
 
-# Mapa ingrediente → término de búsqueda en supermercado
+# Mapa ingrediente → término de búsqueda optimizado por supermercado chileno
 SEARCH_TERMS: dict[str, str] = {
     "Carne de pollo":         "pechuga pollo kg",
     "Carne de vacuno":        "carne molida vacuno kg",
     "Carne de cordero":       "pierna cordero kg",
-    "Carne mixta shawarma":   "carne pollo kg",
+    "Carne mixta shawarma":   "pollo entero kg",
     "Pan pita":               "pan pita",
-    "Pan árabe grande":       "pan árabe",
+    "Pan árabe grande":       "pan arabe",
     "Cebolla":                "cebolla kg",
     "Tomate":                 "tomate kg",
     "Lechuga":                "lechuga",
     "Pepino":                 "pepino",
     "Repollo":                "repollo",
     "Perejil":                "perejil",
-    "Limón":                  "limón kg",
-    "Ajo":                    "ajo",
+    "Limón":                  "limon kg",
+    "Ajo":                    "ajo cabeza",
     "Papas":                  "papas kg",
     "Berenjenas":             "berenjena",
-    "Tahini":                 "tahini",
-    "Yogur natural":          "yogur natural litro",
-    "Mayonesa":               "mayonesa kg",
-    "Queso blanco":           "queso blanco",
-    "Crema de leche":         "crema leche",
-    "Aceite vegetal":         "aceite vegetal litro",
-    "Aceite de oliva":        "aceite oliva litro",
+    "Tahini":                 "tahini pasta sesamo",
+    "Yogur natural":          "yogur natural sin azucar",
+    "Mayonesa":               "mayonesa 1kg",
+    "Queso blanco":           "queso mantecoso",
+    "Crema de leche":         "crema leche 200ml",
+    "Aceite vegetal":         "aceite vegetal 1 litro",
+    "Aceite de oliva":        "aceite oliva",
     "Comino molido":          "comino molido",
-    "Paprika":                "paprika",
-    "Cúrcuma":                "cúrcuma",
+    "Paprika":                "paprika molida",
+    "Cúrcuma":                "curcuma molida",
     "Canela molida":          "canela molida",
     "Pimienta negra":         "pimienta negra molida",
-    "Sal":                    "sal gruesa kg",
-    "Arroz":                  "arroz grano largo kg",
+    "Cardamomo molido":       "cardamomo",
+    "Mezcla especias shawarma": "mezcla especias",
+    "Sal":                    "sal 1kg",
+    "Arroz":                  "arroz largo 1kg",
     "Garbanzos secos":        "garbanzos secos",
     "Aceitunas negras":       "aceitunas negras",
     "Pepinillos encurtidos":  "pepinillos encurtidos",
-    "Vinagre blanco":         "vinagre blanco litro",
-    "Azúcar":                "azúcar kg",
+    "Vinagre blanco":         "vinagre blanco",
+    "Azúcar":                 "azucar 1kg",
     "Agua mineral 500ml":     "agua mineral 500ml",
-    "Bebida lata 350ml":      "coca cola lata 350ml",
-    "Jugo natural (naranja)": "naranja kg",
+    "Bebida lata 350ml":      "coca cola lata",
+    "Jugo natural (naranja)": "naranja malla",
 }
 
 
+def _get_search_fn(nombre_proveedor: str):
+    """Retorna la función de búsqueda apropiada para el proveedor, o None si no tiene scraper."""
+    nombre_lower = nombre_proveedor.lower()
+    # VTEX stores
+    for keyword, vtex_url in VTEX_STORES.items():
+        if keyword in nombre_lower:
+            return lambda q, u=vtex_url: _vtex_search(u, q)
+    # Líder / Walmart Chile
+    if any(k in nombre_lower for k in LIDER_KEYWORDS):
+        return _lider_search
+    return None
+
+
 @router.post("/actualizar-precios-web")
-def actualizar_precios_web(body: dict, db: Session = Depends(get_db), _=Depends(require_admin)):
+async def actualizar_precios_web(body: dict, db: Session = Depends(get_db), _=Depends(require_heavy_ratelimit)):
     """
-    Consulta Jumbo.cl y Unimarc.cl en vivo y actualiza los precios en la BD.
-    body: { "ingrediente_ids": [1,2,3] }  — si vacío, actualiza todos.
+    Consulta las webs de supermercados en vivo y actualiza precios en la BD.
+    body: { "ingrediente_ids": [1,2,3] }  — si vacío actualiza todos los ingredientes.
+    Cadenas soportadas: Jumbo, Santa Isabel, Unimarc, Acuenta (VTEX), Líder (HTML).
     """
     ing_ids: list[int] = body.get("ingrediente_ids", [])
     proveedores = db.query(Proveedor).filter(Proveedor.activo == True).all()
 
-    jumbo = next((p for p in proveedores if "jumbo" in p.nombre.lower()), None)
-    unimarc = next((p for p in proveedores if "unimarc" in p.nombre.lower()), None)
+    # Filtrar solo los que tienen scraper
+    provs_con_scraper = [(p, _get_search_fn(p.nombre)) for p in proveedores]
+    provs_con_scraper = [(p, fn) for p, fn in provs_con_scraper if fn is not None]
 
-    if not jumbo and not unimarc:
-        raise HTTPException(400, "No hay proveedores Jumbo ni Unimarc activos")
+    if not provs_con_scraper:
+        raise HTTPException(400, "No hay proveedores con scraper configurado (Jumbo, Santa Isabel, Unimarc, Acuenta, Líder)")
 
     query_ings = (
         db.query(Ingrediente).filter(Ingrediente.id.in_(ing_ids), Ingrediente.activo == True).all()
@@ -310,33 +387,37 @@ def actualizar_precios_web(body: dict, db: Session = Depends(get_db), _=Depends(
         db.query(Ingrediente).filter(Ingrediente.activo == True).all()
     )
 
-    resultados = []
-    ahora = datetime.utcnow()
+    # Ejecutar scrapers síncronos en thread pool para no bloquear el event loop
+    import asyncio
 
-    for ing in query_ings:
-        termino = SEARCH_TERMS.get(ing.nombre, ing.nombre)
-        fila = {"ingrediente_id": ing.id, "nombre": ing.nombre, "jumbo": None, "unimarc": None}
+    def _run_scrapers():
+        resultados_local = []
+        actualizados_local = 0
+        ahora = datetime.utcnow()
+        for ing in query_ings:
+            termino = SEARCH_TERMS.get(ing.nombre, ing.nombre)
+            fila: dict = {"ingrediente_id": ing.id, "nombre": ing.nombre}
+            ing_actualizado = False
+            for prov, search_fn in provs_con_scraper:
+                result = search_fn(termino)
+                fila[prov.nombre] = result["precio"] if result else None
+                if result and result["precio"] > 0:
+                    notas_prod = result.get("producto") or f"{prov.nombre} web"
+                    _upsert_precio(db, prov.id, ing.id, result["precio"], ahora, notas_prod)
+                    ing_actualizado = True
+            if ing_actualizado:
+                actualizados_local += 1
+            resultados_local.append(fila)
+        db.commit()
+        return actualizados_local, resultados_local
 
-        if jumbo:
-            precio_j = _vtex_search(JUMBO_SEARCH, termino)
-            if precio_j:
-                fila["jumbo"] = precio_j
-                _upsert_precio(db, jumbo.id, ing.id, precio_j, ahora, "Jumbo web")
+    actualizados, resultados = await asyncio.to_thread(_run_scrapers)
 
-        if unimarc:
-            precio_u = _unimarc_search(termino)
-            if precio_u:
-                fila["unimarc"] = precio_u
-                _upsert_precio(db, unimarc.id, ing.id, precio_u, ahora, "Unimarc web")
-
-        resultados.append(fila)
-
-    db.commit()
-
-    actualizados = sum(1 for r in resultados if r["jumbo"] or r["unimarc"])
+    cadenas_usadas = [p.nombre for p, _ in provs_con_scraper]
     return {
         "actualizados": actualizados,
         "total": len(resultados),
+        "cadenas": cadenas_usadas,
         "resultados": resultados,
     }
 
@@ -367,7 +448,7 @@ async def leer_boleta(
     proveedor_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _=Depends(require_admin),
+    _=Depends(require_heavy_ratelimit),
 ):
     """
     Recibe imagen de boleta/ticket, usa Claude vision para extraer precios
@@ -398,15 +479,23 @@ async def leer_boleta(
 Mis ingredientes son:
 {lista_ings}
 
-Extrae los precios de los productos en la boleta que correspondan a mis ingredientes.
-Ajusta el precio al precio por unidad según la unidad del ingrediente (ej: si compró 2kg a $3.000 el total, el precio unitario es $1.500/kg).
+Extrae los datos de los productos en la boleta que correspondan a mis ingredientes.
+- precio_unitario: precio por unidad del ingrediente (ej: si compró 2kg a $3.000 total → precio_unitario=$1.500/kg)
+- cantidad_comprada: cantidad total comprada en la unidad del ingrediente (ej: 2 si compró 2kg)
+- Si no puedes determinar la cantidad con certeza, usa 0.
 
 Responde SOLO con JSON válido, sin texto adicional:
 {{
   "proveedor_detectado": "nombre del supermercado si aparece en la boleta",
   "fecha_boleta": "YYYY-MM-DD si aparece",
   "items": [
-    {{"ingrediente": "nombre exacto del ingrediente de mi lista", "precio_unitario": 1500, "unidad": "kg", "confianza": "alta|media|baja"}}
+    {{
+      "ingrediente": "nombre exacto del ingrediente de mi lista",
+      "precio_unitario": 1500,
+      "cantidad_comprada": 2.0,
+      "unidad": "kg",
+      "confianza": "alta|media|baja"
+    }}
   ],
   "no_reconocidos": ["productos en la boleta que no corresponden a ningún ingrediente"]
 }}"""
@@ -453,16 +542,37 @@ Responde SOLO con JSON válido, sin texto adicional:
     guardados = []
     no_encontrados = []
 
+    stock_actualizado: list[dict] = []
+
     for item in data.get("items", []):
         nombre_lower = item.get("ingrediente", "").lower()
         ing = ing_by_name.get(nombre_lower)
         if not ing:
-            # Búsqueda parcial
             ing = next((i for i in ingredientes if nombre_lower in i.nombre.lower() or i.nombre.lower() in nombre_lower), None)
 
-        if ing and item.get("precio_unitario", 0) > 0:
-            _upsert_precio(db, proveedor_id, ing.id, item["precio_unitario"], ahora, f"Boleta {data.get('fecha_boleta','')}")
-            guardados.append({"ingrediente": ing.nombre, "precio": item["precio_unitario"], "confianza": item.get("confianza","?")})
+        precio = item.get("precio_unitario", 0)
+        cantidad = item.get("cantidad_comprada", 0) or 0
+
+        if ing and precio > 0:
+            _upsert_precio(db, proveedor_id, ing.id, precio, ahora, f"Boleta {data.get('fecha_boleta','')}")
+            entrada = {"ingrediente": ing.nombre, "precio": precio, "confianza": item.get("confianza", "?"), "cantidad_ingresada": None}
+
+            # Actualizar stock si se indicó cantidad comprada
+            if cantidad > 0:
+                ing.stock = round(ing.stock + cantidad, 6)
+                ing.costo_unitario = precio  # actualiza costo de referencia
+                db.add(MovimientoStock(
+                    ingrediente_id=ing.id,
+                    tipo="ENTRADA",
+                    cantidad=cantidad,
+                    motivo=f"Compra boleta — {prov.nombre}",
+                    referencia_id=proveedor_id,
+                    referencia_tipo="boleta",
+                ))
+                entrada["cantidad_ingresada"] = cantidad
+                stock_actualizado.append({"ingrediente": ing.nombre, "cantidad": cantidad, "unidad": ing.unidad, "stock_nuevo": ing.stock})
+
+            guardados.append(entrada)
         else:
             no_encontrados.append(item.get("ingrediente", "?"))
 
@@ -475,4 +585,94 @@ Responde SOLO con JSON válido, sin texto adicional:
         "proveedor_detectado": data.get("proveedor_detectado", ""),
         "fecha_boleta": data.get("fecha_boleta", ""),
         "total_guardados": len(guardados),
+        "stock_actualizado": stock_actualizado,
+    }
+
+
+# ─── Predicción de compras ────────────────────────────────────────────────────
+
+@router.get("/prediccion-compras")
+def prediccion_compras(
+    dias: int = 30,
+    dias_objetivo: int = 14,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    """
+    Analiza el consumo de los últimos `dias` días (SALIDA de stock) y predice
+    cuándo se agotará cada ingrediente, sugiriendo cantidades a pedir para
+    cubrir `dias_objetivo` días adicionales.
+    """
+    desde = datetime.utcnow() - timedelta(days=dias)
+
+    movimientos = (
+        db.query(MovimientoStock)
+        .filter(MovimientoStock.tipo == "SALIDA", MovimientoStock.created_at >= desde)
+        .all()
+    )
+
+    # Suma de consumo por ingrediente en el período
+    consumo_total: dict[int, float] = {}
+    for mov in movimientos:
+        consumo_total[mov.ingrediente_id] = consumo_total.get(mov.ingrediente_id, 0) + abs(mov.cantidad)
+
+    ingredientes = db.query(Ingrediente).filter(Ingrediente.activo == True).order_by(Ingrediente.nombre).all()
+
+    resultado = []
+    for ing in ingredientes:
+        total_consumido = consumo_total.get(ing.id, 0)
+        consumo_diario = total_consumido / dias if dias > 0 else 0
+
+        if consumo_diario > 0:
+            dias_hasta_agotarse: float | None = ing.stock / consumo_diario
+        else:
+            dias_hasta_agotarse = None
+
+        cantidad_sugerida = max(0.0, consumo_diario * dias_objetivo - ing.stock) if consumo_diario > 0 else 0.0
+
+        if dias_hasta_agotarse is not None:
+            if dias_hasta_agotarse < 3:
+                urgencia = "critico"
+            elif dias_hasta_agotarse < 7:
+                urgencia = "alto"
+            elif dias_hasta_agotarse < dias_objetivo:
+                urgencia = "medio"
+            else:
+                urgencia = "ok"
+        else:
+            urgencia = "sin_datos" if total_consumido == 0 else "ok"
+
+        resultado.append({
+            "ingrediente_id": ing.id,
+            "nombre": ing.nombre,
+            "unidad": ing.unidad,
+            "stock_actual": ing.stock,
+            "stock_minimo": ing.stock_minimo,
+            "consumo_diario": round(consumo_diario, 4),
+            "consumo_periodo": round(total_consumido, 3),
+            "dias_hasta_agotarse": round(dias_hasta_agotarse, 1) if dias_hasta_agotarse is not None else None,
+            "cantidad_sugerida": round(cantidad_sugerida, 3),
+            "urgencia": urgencia,
+        })
+
+    # Ordenar: críticos primero, luego por días hasta agotarse
+    def _sort_key(r: dict):
+        orden = {"critico": 0, "alto": 1, "medio": 2, "ok": 3, "sin_datos": 4}
+        d = r["dias_hasta_agotarse"] if r["dias_hasta_agotarse"] is not None else 9999
+        return (orden.get(r["urgencia"], 5), d)
+
+    resultado.sort(key=_sort_key)
+
+    criticos = [r for r in resultado if r["urgencia"] == "critico"]
+    altos    = [r for r in resultado if r["urgencia"] == "alto"]
+
+    return {
+        "periodo_dias": dias,
+        "dias_objetivo": dias_objetivo,
+        "ingredientes": resultado,
+        "resumen": {
+            "criticos": len(criticos),
+            "altos":    len(altos),
+            "con_datos": sum(1 for r in resultado if r["urgencia"] != "sin_datos"),
+        },
     }

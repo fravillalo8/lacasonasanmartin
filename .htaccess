@@ -1,0 +1,28 @@
+ErrorDocument 404 /404.html
+
+RewriteEngine On
+
+# Redirigir HTTP → HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# SPA fallback: rutas de React Router (ej: /inventario) cargan index.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ /index.html [L]
+
+Header always set X-Frame-Options "SAMEORIGIN"
+Header always set X-Content-Type-Options "nosniff"
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+Header always set X-XSS-Protection "1; mode=block"
+Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://observant-smile-production-dc50.up.railway.app; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+
+<FilesMatch "\.(jpg|jpeg|png|gif|webp|svg|ico|woff2|woff|ttf)$">
+    Header always set Cache-Control "public, max-age=2592000"
+</FilesMatch>
+
+<FilesMatch "\.(env|log|py|md|csv|php|sh|sql)$">
+    Require all denied
+</FilesMatch>

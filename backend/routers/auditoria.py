@@ -16,7 +16,7 @@ def listar(
     dias: int = Query(7, ge=1, le=90),
     accion: str = Query(""),
     db: Session = Depends(get_db),
-    _=Depends(require_auth),
+    _=Depends(require_admin),
 ):
     desde = datetime.utcnow() - timedelta(days=dias)
     q = db.query(AuditLog).filter(AuditLog.created_at >= desde)

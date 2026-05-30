@@ -128,6 +128,24 @@ def require_admin(auth: dict = Depends(require_auth)) -> dict:
     return auth
 
 
+# ─── Rate limiting por token (para endpoints costosos) ───────────────────────
+_token_calls: dict[str, list[float]] = {}
+_HEAVY_MAX = 3      # máx 3 llamadas
+_HEAVY_WINDOW = 60  # en 60 segundos
+
+
+def require_heavy_ratelimit(auth: dict = Depends(require_admin)) -> dict:
+    """Limita a 3 llamadas/minuto por token para endpoints que consumen recursos externos."""
+    token = auth["token"]
+    now = time.time()
+    recent = [t for t in _token_calls.get(token, []) if now - t < _HEAVY_WINDOW]
+    if len(recent) >= _HEAVY_MAX:
+        raise HTTPException(status_code=429, detail=f"Máximo {_HEAVY_MAX} operaciones por minuto. Espera un momento.")
+    recent.append(now)
+    _token_calls[token] = recent
+    return auth
+
+
 def verify_token(token: str) -> dict:
     """Verifica token directamente (para SSE que no puede usar headers)."""
     entry = _tokens.get(token)

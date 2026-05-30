@@ -41,8 +41,13 @@ def listar(db: Session = Depends(get_db), _=Depends(require_auth)):
 
 @router.post("")
 def crear(data: ReservaIn, db: Session = Depends(get_db), _=Depends(require_auth)):
+    try:
+        fecha_dt = datetime.fromisoformat(data.fecha)
+    except ValueError:
+        from fastapi import HTTPException
+        raise HTTPException(400, "Formato de fecha inválido (use ISO 8601: YYYY-MM-DDTHH:MM)")
     r = Reserva(
-        fecha=datetime.fromisoformat(data.fecha),
+        fecha=fecha_dt,
         cliente_nombre=data.cliente_nombre,
         cliente_telefono=data.cliente_telefono,
         num_personas=data.num_personas,
@@ -61,7 +66,10 @@ def actualizar(rid: int, data: ReservaIn, db: Session = Depends(get_db), _=Depen
     r = db.query(Reserva).filter(Reserva.id == rid).first()
     if not r:
         raise HTTPException(404, "Reserva no encontrada")
-    r.fecha = datetime.fromisoformat(data.fecha)
+    try:
+        r.fecha = datetime.fromisoformat(data.fecha)
+    except ValueError:
+        raise HTTPException(400, "Formato de fecha inválido (use ISO 8601: YYYY-MM-DDTHH:MM)")
     r.cliente_nombre = data.cliente_nombre
     r.cliente_telefono = data.cliente_telefono
     r.num_personas = data.num_personas

@@ -54,10 +54,12 @@ def init_db():
         "ALTER TABLE ventas ADD COLUMN pago2_tipo VARCHAR(20) DEFAULT ''",
         "ALTER TABLE ventas ADD COLUMN pago2_monto FLOAT DEFAULT 0",
     ]
-    with engine.connect() as conn:
-        for sql in migrations:
-            try:
+    # Cada migración usa su propia conexión para que un fallo (columna ya existe)
+    # no deje la transacción en estado de error en PostgreSQL, bloqueando el resto.
+    for sql in migrations:
+        try:
+            with engine.connect() as conn:
                 conn.execute(text(sql))
                 conn.commit()
-            except Exception:
-                pass  # column already exists
+        except Exception:
+            pass  # column already exists

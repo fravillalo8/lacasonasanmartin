@@ -94,7 +94,7 @@ export default function Dashboard() {
       api.reportes.horariosPico(30).catch(() => null),
     ])
       .then(([d, p]) => { setData(d); setPico(p) })
-      .catch(() => setError('Error cargando datos'))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Error cargando datos'))
       .finally(() => setLoading(false))
   }, [])
 

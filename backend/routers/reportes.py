@@ -15,17 +15,17 @@ router = APIRouter(prefix="/api/reportes", tags=["reportes"])
 @router.get("/dashboard")
 def dashboard(db: Session = Depends(get_db), _=Depends(require_auth)):
     """KPIs principales para el dashboard."""
-    total_ingredientes = db.query(Ingrediente).filter(Ingrediente.activo == True).count()
+    total_ingredientes = db.query(func.count(Ingrediente.id)).filter(Ingrediente.activo == True).scalar() or 0
     alertas_stock = (
-        db.query(Ingrediente)
+        db.query(func.count(Ingrediente.id))
         .filter(
             Ingrediente.activo == True,
             Ingrediente.stock_minimo > 0,
             Ingrediente.stock <= Ingrediente.stock_minimo,
         )
-        .count()
+        .scalar() or 0
     )
-    total_recetas = db.query(Receta).filter(Receta.activo == True).count()
+    total_recetas = db.query(func.count(Receta.id)).filter(Receta.activo == True).scalar() or 0
 
     # Valor total del inventario
     ingredientes = db.query(Ingrediente).filter(Ingrediente.activo == True).all()
@@ -39,7 +39,7 @@ def dashboard(db: Session = Depends(get_db), _=Depends(require_auth)):
         .filter(Compra.fecha >= inicio_mes)
         .scalar() or 0
     )
-    num_compras_mes = db.query(Compra).filter(Compra.fecha >= inicio_mes).count()
+    num_compras_mes = db.query(func.count(Compra.id)).filter(Compra.fecha >= inicio_mes).scalar() or 0
 
     # Últimas compras
     ultimas_compras = (
@@ -52,9 +52,9 @@ def dashboard(db: Session = Depends(get_db), _=Depends(require_auth)):
     # Ventas del día y del mes
     inicio_hoy = hoy.replace(hour=0, minute=0, second=0, microsecond=0)
     ventas_hoy = db.query(func.sum(Venta.total)).filter(Venta.created_at >= inicio_hoy).scalar() or 0
-    num_ventas_hoy = db.query(Venta).filter(Venta.created_at >= inicio_hoy).count()
+    num_ventas_hoy = db.query(func.count(Venta.id)).filter(Venta.created_at >= inicio_hoy).scalar() or 0
     ventas_mes = db.query(func.sum(Venta.total)).filter(Venta.created_at >= inicio_mes).scalar() or 0
-    num_ventas_mes = db.query(Venta).filter(Venta.created_at >= inicio_mes).count()
+    num_ventas_mes = db.query(func.count(Venta.id)).filter(Venta.created_at >= inicio_mes).scalar() or 0
 
     # Ticket promedio del día
     ticket_promedio_hoy = round(ventas_hoy / num_ventas_hoy, 0) if num_ventas_hoy > 0 else 0
@@ -70,28 +70,30 @@ def dashboard(db: Session = Depends(get_db), _=Depends(require_auth)):
         Venta.created_at < inicio_7d,
     ).scalar() or 0
 
-    # Top 3 productos del día (comandas cerradas hoy)
-    top_hoy = (
-        db.query(
-            ItemComanda.producto_id,
-            func.sum(ItemComanda.cantidad).label("qty"),
-        )
-        .join(ItemComanda.comanda)
-        .filter(
-            Comanda.estado == "cerrada",
-            Comanda.created_at >= inicio_hoy,
-        )
-        .group_by(ItemComanda.producto_id)
-        .order_by(func.sum(ItemComanda.cantidad).desc())
-        .limit(3)
-        .all()
-    )
-
+    # Top 3 productos del día (comandas cerradas hoy) — fail gracefully si la tabla está vacía
     top_hoy_data = []
-    for row in top_hoy:
-        prod = db.query(Producto).filter(Producto.id == row.producto_id).first()
-        if prod:
-            top_hoy_data.append({"nombre": prod.nombre, "cantidad": int(row.qty)})
+    try:
+        top_hoy_rows = (
+            db.query(
+                ItemComanda.producto_id,
+                func.sum(ItemComanda.cantidad).label("qty"),
+            )
+            .join(ItemComanda.comanda)
+            .filter(
+                Comanda.estado == "cerrada",
+                Comanda.created_at >= inicio_hoy,
+            )
+            .group_by(ItemComanda.producto_id)
+            .order_by(func.sum(ItemComanda.cantidad).desc())
+            .limit(3)
+            .all()
+        )
+        for row in top_hoy_rows:
+            prod = db.query(Producto).filter(Producto.id == row.producto_id).first()
+            if prod:
+                top_hoy_data.append({"nombre": prod.nombre, "cantidad": int(row.qty)})
+    except Exception:
+        pass
 
     return {
         "total_ingredientes": total_ingredientes,

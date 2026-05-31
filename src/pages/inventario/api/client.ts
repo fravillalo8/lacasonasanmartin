@@ -110,6 +110,12 @@ async function request<T>(
     },
   })
   if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem('inv_token')
+      localStorage.removeItem('inv_role')
+      window.location.href = '/mesa-central/login'
+      throw new Error('Sesión expirada')
+    }
     const text = await res.text().catch(() => '')
     let detail = `HTTP ${res.status}`
     try {

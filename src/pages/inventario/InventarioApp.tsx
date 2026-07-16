@@ -23,6 +23,10 @@ import Proveedores from './Proveedores'
 import Cotizador from './Cotizador'
 import Manual from './Manual'
 import Auditoria from './Auditoria'
+import Coach from './Coach'
+import MargenVivo from './MargenVivo'
+import Fidelizacion from './Fidelizacion'
+import Anulaciones from './Anulaciones'
 
 export type Role = 'admin' | 'mozo' | 'cocina'
 
@@ -98,6 +102,10 @@ export default function InventarioApp() {
                     <Route path="clientes" element={<Clientes />} />
                     <Route path="qr" element={<QRMenu />} />
                     {/* Admin-only */}
+                    <Route path="coach" element={<RoleGuard allow={['admin']}><Coach /></RoleGuard>} />
+                    <Route path="margen-vivo" element={<RoleGuard allow={['admin']}><MargenVivo /></RoleGuard>} />
+                    <Route path="fidelizacion" element={<RoleGuard allow={['admin']}><Fidelizacion /></RoleGuard>} />
+                    <Route path="anulaciones" element={<RoleGuard allow={['admin']}><Anulaciones /></RoleGuard>} />
                     <Route path="cierre" element={<RoleGuard allow={['admin']}><CierreCaja /></RoleGuard>} />
                     <Route path="merma" element={<RoleGuard allow={['admin']}><Merma /></RoleGuard>} />
                     <Route path="compras" element={<RoleGuard allow={['admin']}><Compras /></RoleGuard>} />

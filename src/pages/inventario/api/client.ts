@@ -404,6 +404,20 @@ export const api = {
     prediccion: (dias = 30, diasObjetivo = 14) =>
       request<PrediccionCompras>(`/cotizador/prediccion-compras?dias=${dias}&dias_objetivo=${diasObjetivo}`),
   },
+
+  // ─── Panel IA (Zentral Gastro · Fase 1) ───────────────────────────────────
+  panel: {
+    margenVivo: (dias = 30) => request<MargenVivoData>(`/panel/margen-vivo?dias=${dias}`),
+    coach: () => request<CoachData>('/panel/coach'),
+    sostenibilidad: (dias = 30) => request<SostenibilidadData>(`/panel/sostenibilidad?dias=${dias}`),
+    anulaciones: (dias = 7) => request<AnulacionesData>(`/panel/anulaciones?dias=${dias}`),
+    clientesDormidos: (dias = 30) => request<ClientesDormidosData>(`/panel/clientes-dormidos?dias=${dias}`),
+    winbackMensaje: (data: { nombre: string; dias_sin_venir?: number; gasto_total?: number }) =>
+      request<{ disponible_ia: boolean; mensaje: string }>('/panel/winback-mensaje', {
+        method: 'POST', body: JSON.stringify(data),
+      }),
+    fidelizacion: () => request<FidelizacionData>('/panel/fidelizacion'),
+  },
 }
 
 // ─── Tipos ────────────────────────────────────────────────────────────────
@@ -996,3 +1010,80 @@ export interface EstadisticasRoles {
     total_acciones: number
   }[]
 }
+
+// ─── Panel IA (Zentral Gastro · Fase 1) ──────────────────────────────────────
+export type ClasePlato = 'estrella' | 'caballo' | 'dilema' | 'perro' | 'sin_receta'
+
+export interface PlatoMargen {
+  id: number
+  nombre: string
+  categoria: string
+  precio: number
+  costo: number | null
+  margen: number | null
+  food_cost_pct: number | null
+  vendidos: number
+  sin_receta: boolean
+  clasificacion: ClasePlato
+}
+
+export interface MargenVivoData {
+  dias: number
+  resumen: { food_cost_promedio: number | null; sin_receta: number; total: number }
+  platos: PlatoMargen[]
+}
+
+export interface CoachAccion { icono: string; tipo: string; texto: string }
+
+export interface CoachData {
+  fecha: string
+  disponible_ia: boolean
+  resumen: {
+    ventas_hoy: number
+    num_ventas_hoy: number
+    ventas_ayer: number
+    variacion_pct: number | null
+    ticket_promedio: number
+    texto: string | null
+  }
+  acciones: CoachAccion[]
+}
+
+export interface SostenibilidadData {
+  dias: number
+  costo_total: number
+  eventos: number
+  kg_estimados: number
+  co2e_kg: number
+  por_motivo: { motivo: string; costo: number; eventos: number }[]
+}
+
+export interface AnulacionesData {
+  dias: number
+  total: number
+  por_rol: { rol: string; cantidad: number }[]
+  recientes: { fecha: string | null; accion: string; detalle: string; rol: string; referencia: string }[]
+}
+
+export interface ClienteDormido {
+  id: number
+  nombre: string
+  telefono: string
+  visitas: number
+  gasto_total: number
+  dias_sin_venir: number | null
+}
+
+export interface ClientesDormidosData { dias: number; total: number; clientes: ClienteDormido[] }
+
+export interface FidelizacionCliente {
+  id: number
+  nombre: string
+  telefono: string
+  visitas: number
+  gasto_total: number
+  puntos: number
+  ultima_visita: string | null
+}
+
+export interface FidelizacionData { regla: string; clientes: FidelizacionCliente[] }

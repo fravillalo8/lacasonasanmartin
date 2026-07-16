@@ -22,6 +22,10 @@ import {
   Calculator,
   HelpCircle,
   Shield,
+  Sparkles,
+  TrendingUp,
+  Heart,
+  ShieldAlert,
 } from 'lucide-react'
 import type { Role } from '../InventarioApp'
 
@@ -37,18 +41,24 @@ const ROLE_COLORS: Record<Role, string> = {
   cocina: 'bg-orange-500 text-white',
 }
 
-type NavItem = { to: string; label: string; icon: React.ElementType; end?: boolean; roles: Role[] }
+type Modo = 'simple' | 'pro'
+// level 'basico' = visible también en Modo simple. Sin level = solo en Modo pro.
+type NavItem = { to: string; label: string; icon: React.ElementType; end?: boolean; roles: Role[]; level?: 'basico' }
 
 const NAV: NavItem[] = [
   { to: '/mesa-central', label: 'Dashboard', icon: LayoutDashboard, end: true, roles: ['admin', 'mozo', 'cocina'] },
-  { to: '/mesa-central/mesas', label: 'Mesas', icon: UtensilsCrossed, roles: ['admin', 'mozo'] },
-  { to: '/mesa-central/productos', label: 'Carta', icon: BookOpen, roles: ['admin', 'mozo'] },
-  { to: '/mesa-central/ventas', label: 'Ventas', icon: Banknote, roles: ['admin', 'mozo'] },
-  { to: '/mesa-central/cocina', label: 'Cocina', icon: FlameKindling, roles: ['admin', 'mozo', 'cocina'] },
+  { to: '/mesa-central/coach', label: 'Coach del día', icon: Sparkles, roles: ['admin'], level: 'basico' },
+  { to: '/mesa-central/mesas', label: 'Mesas', icon: UtensilsCrossed, roles: ['admin', 'mozo'], level: 'basico' },
+  { to: '/mesa-central/ventas', label: 'Cobrar', icon: Banknote, roles: ['admin', 'mozo'], level: 'basico' },
+  { to: '/mesa-central/cocina', label: 'Cocina', icon: FlameKindling, roles: ['admin', 'mozo', 'cocina'], level: 'basico' },
+  { to: '/mesa-central/productos', label: 'Carta', icon: BookOpen, roles: ['admin', 'mozo'], level: 'basico' },
+  { to: '/mesa-central/margen-vivo', label: 'Margen Vivo', icon: TrendingUp, roles: ['admin'] },
   { to: '/mesa-central/reservas', label: 'Reservas', icon: CalendarDays, roles: ['admin', 'mozo'] },
   { to: '/mesa-central/clientes', label: 'Clientes', icon: Users, roles: ['admin', 'mozo'] },
+  { to: '/mesa-central/fidelizacion', label: 'Fidelización', icon: Heart, roles: ['admin'] },
   { to: '/mesa-central/qr', label: 'QR Menú', icon: QrCode, roles: ['admin', 'mozo'] },
   { to: '/mesa-central/cierre', label: 'Cierre caja', icon: Wallet, roles: ['admin'] },
+  { to: '/mesa-central/anulaciones', label: 'Anulaciones', icon: ShieldAlert, roles: ['admin'] },
   { to: '/mesa-central/merma', label: 'Merma', icon: Trash2, roles: ['admin'] },
   { to: '/mesa-central/compras', label: 'Compras', icon: ShoppingCart, roles: ['admin'] },
   { to: '/mesa-central/ingredientes', label: 'Ingredientes', icon: Package, roles: ['admin'] },
@@ -63,8 +73,16 @@ const NAV: NavItem[] = [
 
 export default function Sidebar({ role }: { role: Role }) {
   const navigate = useNavigate()
-  const visible = NAV.filter(item => item.roles.includes(role))
+  const [modo, setModo] = useState<Modo>(() => (localStorage.getItem('inv_modo') as Modo) || 'pro')
+  const visible = NAV.filter(
+    item => item.roles.includes(role) && (modo === 'pro' || item.level === 'basico')
+  )
   const [stockAlertas, setStockAlertas] = useState(0)
+
+  function cambiarModo(m: Modo) {
+    setModo(m)
+    localStorage.setItem('inv_modo', m)
+  }
 
   useEffect(() => {
     const fetchAlertas = () =>
@@ -89,6 +107,30 @@ export default function Sidebar({ role }: { role: Role }) {
         <span className={`inline-block mt-2 px-2 py-0.5 rounded text-xs font-semibold ${ROLE_COLORS[role]}`}>
           {ROLE_LABELS[role]}
         </span>
+      </div>
+
+      {/* Modo simple / pro */}
+      <div className="px-3 pt-3">
+        <div className="flex bg-stone-800 rounded-lg p-0.5 text-xs" title="Modo simple muestra solo lo esencial del día a día">
+          <button
+            type="button"
+            onClick={() => cambiarModo('simple')}
+            className={`flex-1 py-1.5 rounded-md font-semibold transition-colors ${
+              modo === 'simple' ? 'bg-amber-500 text-stone-900' : 'text-stone-400 hover:text-white'
+            }`}
+          >
+            Simple
+          </button>
+          <button
+            type="button"
+            onClick={() => cambiarModo('pro')}
+            className={`flex-1 py-1.5 rounded-md font-semibold transition-colors ${
+              modo === 'pro' ? 'bg-amber-500 text-stone-900' : 'text-stone-400 hover:text-white'
+            }`}
+          >
+            Pro
+          </button>
+        </div>
       </div>
 
       {/* Nav */}

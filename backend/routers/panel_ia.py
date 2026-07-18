@@ -15,7 +15,9 @@ Todo degrada sin IA: si no está ANTHROPIC_API_KEY, el Coach y el win-back
 usan reglas/plantillas en vez de romper.
 """
 from datetime import datetime, timedelta
+import re
 import statistics
+import unicodedata
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -40,20 +42,34 @@ def _hoy_bounds():
     return hoy0, hoy0 + timedelta(days=1)
 
 
-def _costo_porcion(db: Session, receta_id):
-    if not receta_id:
-        return None
-    receta = db.query(Receta).filter(Receta.id == receta_id).first()
-    if not receta:
-        return None
-    total = 0.0
-    items = db.query(ItemReceta).filter(ItemReceta.receta_id == receta_id).all()
-    for it in items:
-        ing = db.query(Ingrediente).filter(Ingrediente.id == it.ingrediente_id).first()
-        if ing:
-            total += (it.cantidad or 0) * (ing.costo_unitario or 0)
-    porciones = receta.porciones or 1
-    return total / porciones if porciones else total
+_STOP = {"de", "del", "la", "el", "los", "las", "con", "y", "a", "en", "al"}
+
+
+def _norm(s: str) -> str:
+    """Normaliza un nombre para emparejar producto<->receta (sin tildes/conectores)."""
+    s = (s or "").lower().strip()
+    s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
+    s = re.sub(r"[^a-z0-9]+", " ", s)
+    s = " ".join(w for w in s.split() if w not in _STOP)
+    return s.strip()
+
+
+def _recetas_index(db: Session):
+    """Costo por porción de cada receta, indexado por id y por nombre normalizado.
+    Evita N+1 y permite emparejar productos que no tienen receta_id seteado."""
+    costo_by_id, id_by_norm = {}, {}
+    for r in db.query(Receta).filter(Receta.activo == True).all():  # noqa: E712
+        total = 0.0
+        for it in db.query(ItemReceta).filter(ItemReceta.receta_id == r.id).all():
+            ing = db.query(Ingrediente).filter(Ingrediente.id == it.ingrediente_id).first()
+            if ing:
+                total += (it.cantidad or 0) * (ing.costo_unitario or 0)
+        porciones = r.porciones or 1
+        costo_by_id[r.id] = total / porciones if porciones else total
+        n = _norm(r.nombre)
+        if n and n not in id_by_norm:
+            id_by_norm[n] = r.id
+    return costo_by_id, id_by_norm
 
 
 def _popularidad(db: Session, dias: int):
@@ -70,10 +86,17 @@ def _popularidad(db: Session, dias: int):
 
 def _compute_margen_vivo(db: Session, dias: int):
     pop = _popularidad(db, dias)
+    costo_by_id, id_by_norm = _recetas_index(db)
     productos = db.query(Producto).filter(Producto.activo == True).all()  # noqa: E712
     platos = []
     for p in productos:
-        costo = _costo_porcion(db, p.receta_id)
+        costo, origen = None, None
+        if p.receta_id and p.receta_id in costo_by_id:
+            costo, origen = costo_by_id[p.receta_id], "receta"          # enlace explícito
+        else:
+            rid = id_by_norm.get(_norm(p.nombre))                        # fallback por nombre
+            if rid is not None:
+                costo, origen = costo_by_id.get(rid), "nombre"
         precio = p.precio or 0
         margen = fc = None
         if costo is not None and precio:
@@ -87,6 +110,7 @@ def _compute_margen_vivo(db: Session, dias: int):
             "food_cost_pct": round(fc * 100) if fc is not None else None,
             "vendidos": pop.get(p.id, 0),
             "sin_receta": costo is None,
+            "origen_costo": origen,
         })
 
     con_datos = [x for x in platos if x["margen"] is not None]
@@ -181,6 +205,10 @@ def coach(db: Session = Depends(get_db), _=Depends(require_auth)):
     if merma_hoy > 0:
         acciones.append({"icono": "♻️", "tipo": "merma",
                          "texto": f"Hoy botaste {_clp(merma_hoy)} en merma. Revisa porciones o arma un combo con lo que va a vencer."})
+    sin_receta = [x for x in mv["platos"] if x.get("sin_receta")]
+    if len(sin_receta) >= 3:
+        acciones.append({"icono": "📋", "tipo": "receta",
+                         "texto": f"{len(sin_receta)} platos no tienen receta cargada: no puedo calcularte el margen de ellos. Cárgalas para activar Margen Vivo."})
     if not acciones:
         acciones.append({"icono": "✅", "tipo": "ok",
                          "texto": "Todo en orden hoy: sin quiebres de stock ni platos en rojo. Buen momento para empujar tus estrellas."})

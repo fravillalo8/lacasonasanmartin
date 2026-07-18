@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="MesaControl — La Casona San Martín",
-    version="1.4.0",
+    version="1.4.1",
     docs_url="/api/docs",
     redoc_url=None,
     lifespan=lifespan,
@@ -63,7 +63,7 @@ app.include_router(panel_ia.router)
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "app": "MesaControl", "version": "1.4.0"}
+    return {"status": "ok", "app": "MesaControl", "version": "1.4.1"}
 
 
 if __name__ == "__main__":

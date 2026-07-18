@@ -198,6 +198,7 @@ export default function Cocina() {
   const [todoing, setTodoing] = useState<number | null>(null)
   const [showHistorial, setShowHistorial] = useState(false)
   const [sseConnected, setSseConnected] = useState(false)
+  const [llamada, setLlamada] = useState<{ mesa: number; motivo: string } | null>(null)
   const prevIdsRef = useRef<Set<number>>(new Set())
   const online = useOnlineStatus()
 
@@ -274,9 +275,16 @@ export default function Cocina() {
   }, [reload])
 
   // SSE: actualización instantánea cuando llega evento del servidor
-  useSSE((type) => {
+  useSSE((type, data) => {
+    setSseConnected(true)
+    if (type === 'llamada_mesa') {
+      const d = (data ?? {}) as { numero_mesa?: number; motivo?: string }
+      setLlamada({ mesa: d.numero_mesa ?? 0, motivo: d.motivo || '' })
+      playBeep()
+      setTimeout(() => setLlamada(null), 12000)
+      return
+    }
     if (type === 'comanda_nueva' || type === 'comanda_update' || type === 'comanda_cerrada' || type === 'lista_para_servir') {
-      setSseConnected(true)
       reload()
     }
   })
@@ -332,6 +340,13 @@ export default function Cocina() {
           </button>
         </div>
       </div>
+
+      {llamada && (
+        <div className="mb-4 rounded-xl bg-amber-500 text-stone-900 px-4 py-3 font-bold flex items-center gap-2 animate-pulse">
+          🔔 Mesa {llamada.mesa} llama al garzón{llamada.motivo ? ` — ${llamada.motivo}` : ''}
+          <button type="button" onClick={() => setLlamada(null)} className="ml-auto text-stone-900/70 text-lg leading-none">✕</button>
+        </div>
+      )}
 
       {fetchErr && (
         <div className="mb-4 rounded-xl bg-red-900/60 border border-red-500/50 px-4 py-3 text-sm text-red-300 flex items-center gap-2">

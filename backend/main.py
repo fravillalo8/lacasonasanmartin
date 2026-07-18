@@ -8,7 +8,7 @@ load_dotenv()
 
 from database import init_db
 from routers import auth, ingredientes, compras, recetas, reportes, productos, mesas, comandas, ventas, reservas, clientes, caja, merma
-from routers import backup, proveedores, cotizador, mp_point, events, auditoria, panel_ia
+from routers import backup, proveedores, cotizador, mp_point, events, auditoria, panel_ia, carta
 
 
 @asynccontextmanager
@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="MesaControl — La Casona San Martín",
-    version="1.4.1",
+    version="1.5.0",
     docs_url="/api/docs",
     redoc_url=None,
     lifespan=lifespan,
@@ -59,11 +59,12 @@ app.include_router(mp_point.router)
 app.include_router(events.router)
 app.include_router(auditoria.router)
 app.include_router(panel_ia.router)
+app.include_router(carta.router)
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "app": "MesaControl", "version": "1.4.1"}
+    return {"status": "ok", "app": "MesaControl", "version": "1.5.0"}
 
 
 if __name__ == "__main__":

@@ -29,12 +29,12 @@ def broadcast(event_type: str, data: dict) -> None:
     """Envía un evento a todos los clientes SSE conectados."""
     msg = json.dumps({"type": event_type, "data": data}, ensure_ascii=False)
     dead: set[asyncio.Queue] = set()
-    for q in _subscribers:
+    for q in list(_subscribers):
         try:
             q.put_nowait(msg)
         except asyncio.QueueFull:
             dead.add(q)
-    _subscribers -= dead
+    _subscribers.difference_update(dead)   # mutar en sitio (evita UnboundLocalError por reasignar)
 
 
 async def _generate(q: asyncio.Queue) -> AsyncGenerator[str, None]:

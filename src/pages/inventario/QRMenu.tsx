@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from './api/client'
-import type { Producto } from './api/client'
+import type { Producto, Mesa } from './api/client'
 import { QrCode, Download, ExternalLink, Copy, Check } from 'lucide-react'
 
 const MENU_URL = 'https://lacasonasanmartin.cl/carta'
@@ -11,22 +11,28 @@ function clpFormat(n: number) {
 
 export default function QRMenu() {
   const [productos, setProductos] = useState<Producto[]>([])
+  const [mesas, setMesas] = useState<Mesa[]>([])
+  const [sel, setSel] = useState<string>('general')   // 'general' | id de mesa
   const [copied, setCopied] = useState(false)
   const qrRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     api.productos.list(true).then(setProductos)
+    api.mesas.list().then(setMesas).catch(() => {})
   }, [])
 
+  const targetUrl = sel === 'general' ? MENU_URL : `${MENU_URL}?mesa=${sel}`
+  const selMesa = mesas.find(m => String(m.id) === sel)
+
   function copyLink() {
-    navigator.clipboard.writeText(MENU_URL).then(() => {
+    navigator.clipboard.writeText(targetUrl).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
   }
 
   // QR using a public API (qrserver.com)
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(MENU_URL)}&bgcolor=fff&color=1c1917&qzone=2`
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(targetUrl)}&bgcolor=fff&color=1c1917&qzone=2`
 
   const categorias: Record<string, Producto[]> = {}
   for (const p of productos.filter(p => !p.agotado_hoy)) {
@@ -46,6 +52,22 @@ export default function QRMenu() {
             <h2 className="font-semibold text-stone-700">Código QR de la carta</h2>
           </div>
 
+          <div>
+            <label className="text-xs text-stone-500 font-medium">Generar QR para</label>
+            <select
+              value={sel}
+              onChange={e => setSel(e.target.value)}
+              className="w-full mt-1 border border-stone-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"
+            >
+              <option value="general">Solo ver la carta (general)</option>
+              {mesas.map(m => (
+                <option key={m.id} value={m.id}>
+                  Mesa {m.numero}{m.nombre ? ` · ${m.nombre}` : ''} — pedir desde la mesa
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div ref={qrRef} className="flex justify-center p-4 bg-stone-50 rounded-xl">
             <img
               src={qrUrl}
@@ -55,7 +77,7 @@ export default function QRMenu() {
           </div>
 
           <div className="flex items-center gap-2 bg-stone-50 rounded-xl px-3 py-2">
-            <p className="flex-1 text-xs text-stone-500 truncate">{MENU_URL}</p>
+            <p className="flex-1 text-xs text-stone-500 truncate">{targetUrl}</p>
             <button
               type="button"
               onClick={copyLink}
@@ -69,7 +91,7 @@ export default function QRMenu() {
           <div className="flex gap-3">
             <a
               href={qrUrl}
-              download="carta-qr.png"
+              download={sel === 'general' ? 'carta-qr.png' : `carta-qr-mesa-${selMesa?.numero ?? sel}.png`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-stone-900 font-semibold rounded-xl py-2 text-sm transition-colors"
@@ -77,17 +99,19 @@ export default function QRMenu() {
               <Download size={15} /> Descargar QR
             </a>
             <a
-              href={MENU_URL}
+              href={targetUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 border border-stone-200 rounded-xl px-4 py-2 text-sm text-stone-600 hover:bg-stone-50 transition-colors"
             >
-              <ExternalLink size={15} /> Ver carta
+              <ExternalLink size={15} /> {sel === 'general' ? 'Ver carta' : 'Probar'}
             </a>
           </div>
 
           <p className="text-xs text-stone-400 text-center">
-            Imprime este QR y ponlo en cada mesa para que los clientes vean el menú digital.
+            {sel === 'general'
+              ? 'QR general: los clientes ven la carta (sin pedir). Ideal para la entrada o redes.'
+              : `QR de la Mesa ${selMesa?.numero ?? ''}: imprímelo y ponlo en esa mesa. El cliente pide y el pedido cae directo a la cocina.`}
           </p>
         </div>
 

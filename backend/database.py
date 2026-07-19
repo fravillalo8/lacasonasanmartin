@@ -53,6 +53,8 @@ def init_db():
         "ALTER TABLE mesas ADD COLUMN posicion_y INTEGER DEFAULT 0",
         "ALTER TABLE ventas ADD COLUMN pago2_tipo VARCHAR(20) DEFAULT ''",
         "ALTER TABLE ventas ADD COLUMN pago2_monto FLOAT DEFAULT 0",
+        # v1.6.0 — carta multilingüe + alérgenos
+        "ALTER TABLE productos ADD COLUMN etiquetas VARCHAR(200) DEFAULT ''",
     ]
     # Cada migración usa su propia conexión para que un fallo (columna ya existe)
     # no deje la transacción en estado de error en PostgreSQL, bloqueando el resto.

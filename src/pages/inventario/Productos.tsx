@@ -5,6 +5,14 @@ import { Plus, Pencil, Trash2, Upload, X, Check, ImageOff, Camera, Link as LinkI
 
 const CATEGORIAS = ['Entradas', 'Platos principales', 'Postres', 'Bebidas', 'Vinos', 'Tragos', 'Sin categoría']
 
+export const ETIQUETAS: { key: string; label: string }[] = [
+  { key: 'vegetariano', label: '🌱 Vegetariano' },
+  { key: 'vegano', label: 'Ⓥ Vegano' },
+  { key: 'sin_gluten', label: '🌾 Sin gluten' },
+  { key: 'sin_lactosa', label: '🥛 Sin lactosa' },
+  { key: 'picante', label: '🌶️ Picante' },
+]
+
 function clpFormat(n: number) {
   return `$${n.toLocaleString('es-CL')}`
 }
@@ -49,7 +57,14 @@ function FormProducto({
     categoria: initial?.categoria ?? '',
     foto: initial?.foto ?? '',
     activo: initial?.activo ?? true,
+    etiquetas: initial?.etiquetas ?? '',
   })
+  const tags = (form.etiquetas || '').split(',').map(s => s.trim()).filter(Boolean)
+  function toggleTag(k: string) {
+    const set = new Set(tags)
+    if (set.has(k)) set.delete(k); else set.add(k)
+    setForm(f => ({ ...f, etiquetas: Array.from(set).join(',') }))
+  }
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const [fotoModo, setFotoModo] = useState<'url' | 'archivo'>('url')
@@ -124,6 +139,26 @@ function FormProducto({
           value={form.descripcion}
           onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
         />
+      </div>
+      <div>
+        <label className="text-xs text-stone-500 mb-1 block">Etiquetas (dietéticas / alérgenos)</label>
+        <div className="flex flex-wrap gap-1.5">
+          {ETIQUETAS.map(t => {
+            const on = tags.includes(t.key)
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => toggleTag(t.key)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  on ? 'bg-emerald-500 border-emerald-500 text-white' : 'bg-white border-stone-200 text-stone-500 hover:border-emerald-300'
+                }`}
+              >
+                {t.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
       <div>
         <div className="flex items-center justify-between mb-1">

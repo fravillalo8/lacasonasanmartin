@@ -110,6 +110,7 @@ class Producto(Base):
     foto = Column(Text, default="")          # URL de imagen
     activo = Column(Boolean, default=True)
     agotado_hoy = Column(Boolean, default=False)
+    etiquetas = Column(String(200), default="")  # dietéticas separadas por coma: vegetariano,vegano,sin_gluten,sin_lactosa,picante
     receta_id = Column(Integer, ForeignKey("recetas.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -279,4 +280,16 @@ class AuditLog(Base):
     usuario_rol = Column(String(20), default="")   # admin, mozo, cocina
     referencia_id = Column(Integer, nullable=True)  # comanda_id, venta_id, etc.
     referencia_tipo = Column(String(30), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CartaTraduccion(Base):
+    """Cache de traducciones de la carta por producto e idioma (llenado por IA)."""
+    __tablename__ = "carta_traducciones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    producto_id = Column(Integer, ForeignKey("productos.id"), index=True)
+    lang = Column(String(5), index=True)          # en, pt, ...
+    nombre = Column(String(200), default="")
+    descripcion = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)

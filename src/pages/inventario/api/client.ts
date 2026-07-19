@@ -679,6 +679,7 @@ export interface Producto {
   foto: string
   activo: boolean
   agotado_hoy: boolean
+  etiquetas: string
 }
 
 export interface ProductoIn {
@@ -688,6 +689,7 @@ export interface ProductoIn {
   categoria?: string
   foto?: string
   activo?: boolean
+  etiquetas?: string
 }
 
 export interface Mesa {

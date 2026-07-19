@@ -21,9 +21,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Mesa, Comanda, ItemComanda, Producto, AuditLog
+from models import Mesa, Comanda, ItemComanda, Producto, AuditLog, CartaTraduccion
 from routers.events import broadcast
 from routers.comandas import _asignar_ticket
+import ia
 
 router = APIRouter(prefix="/api/carta", tags=["carta-publica"])
 
@@ -75,6 +76,71 @@ def get_mesa(mesa_id: int, db: Session = Depends(get_db)):
     if not m:
         raise HTTPException(404, "Mesa no encontrada")
     return {"id": m.id, "numero": m.numero, "nombre": m.nombre or ""}
+
+
+_LANGS = {"en": "inglés", "pt": "portugués"}
+
+
+def _plato(p: Producto, nombre=None, descripcion=None) -> dict:
+    foto = p.foto if (p.foto and not p.foto.startswith("data:")) else ""
+    return {
+        "id": p.id, "nombre": nombre or p.nombre,
+        "descripcion": descripcion if descripcion is not None else (p.descripcion or ""),
+        "precio": p.precio or 0, "categoria": p.categoria or "", "foto": foto,
+        "activo": True, "agotado_hoy": bool(p.agotado_hoy), "etiquetas": p.etiquetas or "",
+    }
+
+
+@router.get("/menu")
+def menu_publico(lang: str = "es", db: Session = Depends(get_db)):
+    """Carta pública, opcionalmente traducida (?lang=en|pt). La traducción usa IA y se
+    cachea por producto+idioma; si no hay ANTHROPIC_API_KEY degrada a español."""
+    lang = (lang or "es").lower()[:5]
+    productos = (db.query(Producto).filter(Producto.activo == True)  # noqa: E712
+                 .order_by(Producto.categoria, Producto.nombre).all())
+
+    if lang == "es" or lang not in _LANGS:
+        return {"lang": "es", "traducido": False, "productos": [_plato(p) for p in productos]}
+
+    cache = {t.producto_id: t for t in
+             db.query(CartaTraduccion).filter(CartaTraduccion.lang == lang).all()}
+    faltantes = [p for p in productos if p.id not in cache]
+    if faltantes and ia.ia_disponible():
+        try:
+            items = [{"id": p.id, "nombre": p.nombre, "descripcion": p.descripcion or ""} for p in faltantes]
+            prompt = (
+                f"Traduce al {_LANGS[lang]} el nombre y la descripción de estos platos de un "
+                f"restaurante chileno de cocina árabe. Conserva nombres propios de platos cuando "
+                f"corresponda. Devuelve SOLO JSON con esta forma: "
+                '{"items":[{"id":N,"nombre":"...","descripcion":"..."}]}. '
+                f"Platos: {items}"
+            )
+            parsed = ia.call_claude_json(prompt, max_tokens=1800)
+            if parsed and isinstance(parsed.get("items"), list):
+                by_id = {it.get("id"): it for it in parsed["items"] if isinstance(it, dict)}
+                for p in faltantes:
+                    it = by_id.get(p.id)
+                    if it:
+                        t = CartaTraduccion(
+                            producto_id=p.id, lang=lang,
+                            nombre=(it.get("nombre") or p.nombre)[:200],
+                            descripcion=(it.get("descripcion") or "")[:500],
+                        )
+                        db.add(t); cache[p.id] = t
+                db.commit()
+        except Exception:  # noqa: BLE001
+            pass  # degrada a español para lo no traducido
+
+    traducido = False
+    out = []
+    for p in productos:
+        t = cache.get(p.id)
+        if t:
+            traducido = True
+            out.append(_plato(p, nombre=t.nombre, descripcion=t.descripcion))
+        else:
+            out.append(_plato(p))
+    return {"lang": lang, "traducido": traducido, "productos": out}
 
 
 @router.post("/pedido")

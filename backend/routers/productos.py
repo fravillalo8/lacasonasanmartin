@@ -18,6 +18,7 @@ class ProductoIn(BaseModel):
     categoria: str = ""
     foto: str = ""
     activo: bool = True
+    etiquetas: str = ""
     receta_id: Optional[int] = None
 
 
@@ -34,6 +35,7 @@ class ProductoOut(BaseModel):
     foto: str
     activo: bool
     agotado_hoy: bool = False
+    etiquetas: str = ""
     receta_id: Optional[int] = None
 
     class Config:

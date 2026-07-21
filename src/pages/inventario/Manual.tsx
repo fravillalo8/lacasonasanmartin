@@ -99,7 +99,7 @@ export default function Manual() {
             <BookOpen size={22} className="text-amber-500" />
             <h1 className="text-2xl font-bold text-stone-800">Manual de usuario</h1>
           </div>
-          <p className="text-stone-400 text-sm">MesaControl · La Casona San Martín</p>
+          <p className="text-stone-400 text-sm">Zentral Gastro · La Casona San Martín</p>
         </div>
         <button
           type="button"
@@ -375,20 +375,77 @@ export default function Manual() {
 
       {/* ── QR CARTA ─────────────────────────────────────── */}
       {visible(['mozo', 'admin']) && (
-        <Section title="📲 Carta digital (QR)">
+        <Section title="📲 Carta digital (QR) — multilingüe + alérgenos">
           <div className="flex flex-wrap gap-2 mb-4"><Badge rol="mozo" /><Badge rol="admin" /></div>
           <div className="space-y-2">
-            <Paso n={1}>Ve a <strong>QR Menú</strong> para ver el código QR del local.</Paso>
+            <Paso n={1}>Ve a <strong>QR Menú</strong> para generar el código QR — puedes crear uno <strong>por mesa</strong> (abre la carta apuntando a esa mesa) o uno general del local.</Paso>
             <Paso n={2}>Imprímelo o ponlo en la mesa. Los clientes lo escanean y ven la carta en <strong>lacasonasanmartin.cl/carta</strong>.</Paso>
-            <Paso n={3}>La carta se actualiza automáticamente con los precios y productos activos.</Paso>
-            <Paso n={4}>Los productos marcados como Agotado no aparecen en la carta del cliente.</Paso>
+            <Paso n={3}>La carta se actualiza sola con los precios y productos activos; lo marcado como Agotado no aparece.</Paso>
           </div>
+          <H3>Lo nuevo para el comensal</H3>
+          <div className="space-y-2">
+            <Paso n={1}><strong>3 idiomas</strong>: el cliente cambia entre Español / English / Português con un botón — ideal para turistas.</Paso>
+            <Paso n={2}><strong>Alérgenos y dietético</strong>: cada plato muestra sus etiquetas (sin gluten, vegetariano…) y hay un filtro para ver solo lo apto.</Paso>
+            <Paso n={3}><strong>Aviso de alergia</strong>: la casilla “⚠️ Tengo alergia / soy celíaco” se antepone al pedido para que cocina lo vea primero.</Paso>
+          </div>
+          <Tip>Las etiquetas de alérgenos se cargan por producto en <strong>Carta → editar producto → Etiquetas</strong>. La traducción a inglés/portugués la hace la IA y queda cacheada; sin IA se muestra en español.</Tip>
+        </Section>
+      )}
+
+      {/* ── AUTO-PEDIDO QR ─────────────────────────────────── */}
+      {visible(['mozo', 'cocina', 'admin']) && (
+        <Section title="🛒 Auto-Pedido desde la mesa (QR)" defaultOpen={filtroRol === 'cocina'}>
+          <div className="flex flex-wrap gap-2 mb-4"><Badge rol="mozo" /><Badge rol="cocina" /><Badge rol="admin" /></div>
+          <p className="text-stone-600 text-sm">El comensal pide sin esperar al garzón: escanea el QR de su mesa, arma el carrito y envía a cocina.</p>
+          <div className="space-y-2 mt-2">
+            <Paso n={1}>El QR de la mesa abre <strong>lacasonasanmartin.cl/carta?mesa=N</strong> (N = número de mesa).</Paso>
+            <Paso n={2}>El cliente agrega productos al carrito y presiona <strong>“Enviar a cocina”</strong>.</Paso>
+            <Paso n={3}>El pedido cae en <strong>Cocina</strong> marcado <strong>“📱 Pedido del cliente (QR)”</strong> para que el garzón lo confirme.</Paso>
+            <Paso n={4}><strong>Llamar al garzón</strong>: un botón en la carta avisa a piso/cocina con sonido y un banner, sin levantar la mano.</Paso>
+          </div>
+          <Alerta>El precio siempre lo pone el sistema (no el cliente) y hay topes anti-abuso por pedido. El garzón valida antes de cobrar.</Alerta>
+          <Tip>Para probarlo en la demo: abre <strong>/carta?mesa=1</strong> en el teléfono, manda un pedido y míralo aparecer solo en <strong>Cocina</strong>.</Tip>
+        </Section>
+      )}
+
+      {/* ── INTELIGENCIA (PANEL DEL DUEÑO) ─────────────────── */}
+      {visible(['admin']) && (
+        <Section title="🧠 Inteligencia del dueño (Zentral Gastro)">
+          <div className="flex flex-wrap gap-2 mb-4"><Badge rol="admin" /></div>
+          <p className="text-stone-600 text-sm">Lo que hace a Zentral Gastro más que una caja: te dice qué platos ganan plata, a quién reactivar y dónde se te escapa la caja.</p>
+
+          <H3>Margen Vivo</H3>
+          <div className="space-y-2">
+            <Paso n={1}>Ve a <strong>Margen Vivo</strong>: muestra el <strong>margen real por plato al día</strong> (precio − costo de receta).</Paso>
+            <Paso n={2}>Clasifica el menú por popularidad × margen: <em>Estrella</em> (vende y gana), <em>Caballo</em> (vende poco margen), <em>Dilema</em> (gana pero no vende) y <em>Perro</em> (ni vende ni gana).</Paso>
+            <Paso n={3}>Los platos <strong>sin receta cargada</strong> salen avisados — cárgales receta para que entren al cálculo.</Paso>
+          </div>
+
+          <H3>Coach del día</H3>
+          <div className="space-y-2">
+            <Paso n={1}>Ve a <strong>Coach</strong>: recomendaciones concretas del día (qué empujar, qué subir de precio, qué platos no tienen receta).</Paso>
+            <Paso n={2}>Con la IA activada el consejo lo redacta Claude; sin IA funciona por reglas.</Paso>
+          </div>
+
+          <H3>Fidelización</H3>
+          <div className="space-y-2">
+            <Paso n={1}>Ve a <strong>Fidelización</strong>: “Puntos que Vuelven” + detección de <strong>clientes dormidos</strong>.</Paso>
+            <Paso n={2}>Genera un <strong>mensaje de win-back</strong> listo para copiar y enviar por WhatsApp.</Paso>
+          </div>
+
+          <H3>Anulaciones</H3>
+          <div className="space-y-2">
+            <Paso n={1}>Ve a <strong>Anulaciones</strong>: control anti-fuga — qué se anula, cuánto y por quién.</Paso>
+            <Paso n={2}>Es el hueco por donde se va la plata; revísalo seguido.</Paso>
+          </div>
+
+          <Tip>El interruptor <strong>modo simple / pro</strong> (arriba en el menú) oculta lo avanzado y deja solo lo esencial para el garzón, o lo muestra todo para el dueño.</Tip>
         </Section>
       )}
 
       {/* Footer */}
       <div className="text-center text-xs text-stone-400 pt-4 pb-8 print:pb-0">
-        MesaControl · La Casona San Martín · Rinconada de Los Andes
+        Zentral Gastro · La Casona San Martín · Rinconada de Los Andes
         <br />
         Soporte técnico: <span className="text-stone-500">fravillalo@gmail.com</span>
       </div>

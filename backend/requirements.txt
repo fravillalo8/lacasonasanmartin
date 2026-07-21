@@ -11,3 +11,5 @@ python-dotenv==1.0.1
 psycopg2-binary==2.9.10
 anthropic>=0.50.0
 beautifulsoup4==4.12.3
+
+tzdata

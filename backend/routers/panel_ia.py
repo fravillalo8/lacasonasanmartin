@@ -36,10 +36,23 @@ router = APIRouter(prefix="/api/panel", tags=["panel-ia"])
 
 
 # ---------------------------------------------------------------- helpers
+from datetime import timezone as _tz
+try:
+    from zoneinfo import ZoneInfo
+    _CL = ZoneInfo("America/Santiago")
+except Exception:                       # sin tzdata: cae a horario estándar de Chile
+    _CL = _tz(timedelta(hours=-4))
+
+
 def _hoy_bounds():
-    now = datetime.utcnow()
-    hoy0 = datetime(now.year, now.month, now.day)
-    return hoy0, hoy0 + timedelta(days=1)
+    """Límites [hoy0, mañana) del día de HOY en Chile, expresados en UTC-naive
+    (created_at se guarda con datetime.utcnow → UTC-naive). Evita que la cena
+    (después de las 20:00 CL) caiga en el día siguiente."""
+    now_cl = datetime.now(_CL)
+    hoy0_cl = now_cl.replace(hour=0, minute=0, second=0, microsecond=0)
+    hoy1_cl = hoy0_cl + timedelta(days=1)
+    to_utc = lambda d: d.astimezone(_tz.utc).replace(tzinfo=None)
+    return to_utc(hoy0_cl), to_utc(hoy1_cl)
 
 
 _STOP = {"de", "del", "la", "el", "los", "las", "con", "y", "a", "en", "al"}

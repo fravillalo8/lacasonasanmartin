@@ -28,6 +28,8 @@ app = FastAPI(
 _allowed = [
     "https://lacasonasanmartin.cl",
     "https://www.lacasonasanmartin.cl",
+    "https://vallevolt.cl",          # demo pública del producto en vallevolt.cl/gastro
+    "https://www.vallevolt.cl",
     "http://localhost:5173",
     "http://localhost:4173",
 ]

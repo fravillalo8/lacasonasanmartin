@@ -27,10 +27,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
   }
 }
 
+// Soporta despliegue en subcarpeta (ej. /gastro/) sin romper el deploy raíz:
+// Vite inyecta BASE_URL = la base del build ('/' por defecto, '/gastro/' con --base=/gastro/).
+const BASENAME = import.meta.env.BASE_URL.replace(/\/+$/, "") || undefined;
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter basename={BASENAME}>
         <App />
       </BrowserRouter>
     </ErrorBoundary>

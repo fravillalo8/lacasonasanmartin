@@ -65,3 +65,13 @@ def init_db():
                 conn.commit()
         except Exception:
             pass  # column already exists
+
+    # Seed de demo por instancia (idempotente). Solo corre donde SEED_DEMO esté
+    # definido; La Casona NO lo tiene → su base queda intacta.
+    seed = os.getenv("SEED_DEMO", "").strip().lower()
+    if seed == "luchador":
+        try:
+            from seed_luchador import seed_if_empty
+            seed_if_empty()
+        except Exception as e:
+            print(f"seed demo skip: {e}")

@@ -4,6 +4,13 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import "./index.css";
 import App from "./App";
+import { BRAND } from "./brand";
+
+// Solo en builds con marca por env (ej. El Luchador) sobreescribimos el título;
+// el build raíz (La Casona) conserva su <title> de SEO del index.html.
+if (import.meta.env.VITE_BRAND_NAME) {
+  document.title = `${BRAND.name} · ${BRAND.sub}`;
+}
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null }

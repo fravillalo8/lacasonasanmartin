@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { api, OfflineEnqueuedError, syncQueue } from './api/client'
 import type { Mesa, MesaIn, Comanda, ItemComanda, Producto, PagoOut, MPDevice, HistorialComanda } from './api/client'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import { BRAND } from '../../brand'
 import { useSSE } from '../../hooks/useSSE'
 import {
   Plus, X, Trash2, Settings, Users, ChevronRight, Minus, Clock, FileText, PenLine,
@@ -675,8 +676,8 @@ function ComandaPanel({
       '.total{font-weight:bold;font-size:15px}',
       '@media print{button{display:none}}',
       '</style></head><body>',
-      '<h2>La Casona San Martín</h2>',
-      '<p class="center" style="margin:0;color:#666">MesaControl</p>',
+      `<h2>${_esc(BRAND.sub)}</h2>`,
+      `<p class="center" style="margin:0;color:#666">${_esc(BRAND.name)}</p>`,
       '<div class="divider"></div>',
       `<div class="row"><span>${_esc(panelTitle)}</span><span>${_esc(now)}</span></div>`,
       '<div class="divider"></div>',

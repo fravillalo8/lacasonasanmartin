@@ -4,6 +4,7 @@ import type { Comanda } from './api/client'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useSSE } from '../../hooks/useSSE'
 import { RefreshCw, Clock, UtensilsCrossed, CheckCircle2, CheckCheck, History, ChevronDown, ChevronUp, Wifi } from 'lucide-react'
+import { BRAND } from '../../brand'
 
 function minutos(iso: string): string {
   const diff = Date.now() - new Date(iso + 'Z').getTime()
@@ -314,7 +315,7 @@ export default function Cocina() {
           </div>
           <div>
             <p className="font-bold text-lg leading-tight">Vista Cocina</p>
-            <p className="text-xs text-stone-400">La Casona San Martín</p>
+            <p className="text-xs text-stone-400">{BRAND.sub}</p>
           </div>
         </div>
         <div className="flex items-center gap-3 text-stone-400 text-xs">

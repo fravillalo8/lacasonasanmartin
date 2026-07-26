@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from './api/client'
 import type { Producto, Mesa } from './api/client'
 import { QrCode, Download, ExternalLink, Copy, Check } from 'lucide-react'
+import { BRAND } from '../../brand'
 
-const MENU_URL = 'https://lacasonasanmartin.cl/carta'
+const MENU_URL = import.meta.env.VITE_CARTA_URL ?? 'https://lacasonasanmartin.cl/carta'
 
 function clpFormat(n: number) {
   return `$${Math.round(n).toLocaleString('es-CL')}`
@@ -118,7 +119,7 @@ export default function QRMenu() {
         {/* Preview de la carta */}
         <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-stone-100 bg-stone-900">
-            <p className="text-amber-400 font-bold">La Casona San Martín</p>
+            <p className="text-amber-400 font-bold">{BRAND.sub}</p>
             <p className="text-xs text-stone-400">Carta digital — {productos.filter(p => !p.agotado_hoy).length} productos disponibles</p>
           </div>
           <div className="p-4 max-h-[440px] overflow-y-auto space-y-4">

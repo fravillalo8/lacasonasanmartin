@@ -3,6 +3,7 @@ import {
   ChefHat, UtensilsCrossed, ShieldCheck, ChevronDown, ChevronRight,
   BookOpen, Printer,
 } from 'lucide-react'
+import { BRAND } from '../../brand'
 
 type Rol = 'mozo' | 'cocina' | 'admin'
 
@@ -99,7 +100,7 @@ export default function Manual() {
             <BookOpen size={22} className="text-amber-500" />
             <h1 className="text-2xl font-bold text-stone-800">Manual de usuario</h1>
           </div>
-          <p className="text-stone-400 text-sm">Zentral Gastro · La Casona San Martín</p>
+          <p className="text-stone-400 text-sm">Zentral Gastro · {BRAND.sub}</p>
         </div>
         <button
           type="button"
@@ -445,7 +446,7 @@ export default function Manual() {
 
       {/* Footer */}
       <div className="text-center text-xs text-stone-400 pt-4 pb-8 print:pb-0">
-        Zentral Gastro · La Casona San Martín · Rinconada de Los Andes
+        Zentral Gastro · {BRAND.sub}
         <br />
         Soporte técnico: <span className="text-stone-500">fravillalo@gmail.com</span>
       </div>

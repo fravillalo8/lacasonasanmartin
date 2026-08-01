@@ -25,9 +25,12 @@ export default function CotizarLocal() {
   const [concepto, setConcepto] = useState("");
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [marketing, setMarketing] = useState(false);
   const [sent, setSent] = useState(false);
 
-  const isValid = tipo && concepto.trim().length > 10 && nombre.trim() && telefono.trim();
+  const isValid =
+    tipo && concepto.trim().length > 10 && nombre.trim() && telefono.trim() && consent;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +41,8 @@ export default function CotizarLocal() {
       `*Tipo de negocio:* ${tipoLabel}\n` +
       `*Qué quiero montar:* ${concepto.trim()}\n` +
       `*Nombre:* ${nombre.trim()}\n` +
-      `*Teléfono:* ${telefono.trim()}`;
+      `*Teléfono:* ${telefono.trim()}` +
+      (marketing ? `\n*Acepta recibir novedades:* Sí` : ``);
     window.open(`https://wa.me/${ADMIN_WA}?text=${encodeURIComponent(msg)}`, "_blank");
     setSent(true);
   };
@@ -46,7 +50,7 @@ export default function CotizarLocal() {
   return (
     <section
       id="cotizar"
-      className="relative bg-black py-24 sm:py-32 px-4 sm:px-6"
+      className="relative bg-black py-14 sm:py-20 px-4 sm:px-6"
     >
       <div className="bg-noise pointer-events-none absolute inset-0 opacity-[0.12]" />
       <div className="relative mx-auto max-w-5xl">
@@ -195,6 +199,46 @@ export default function CotizarLocal() {
             </div>
           </div>
 
+          {/* Consentimiento — Ley 19.628 / Ley 21.719 */}
+          <div className="space-y-3 border-t border-white/5 pt-6">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-[#D4A574]"
+              />
+              <span className="text-xs leading-relaxed text-gray-400">
+                Autorizo a Casona San Martín a tratar los datos que entrego en este
+                formulario con la única finalidad de contactarme y responder mi solicitud
+                de cotización de local. He leído la{" "}
+                <a
+                  href="/politica-privacidad.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                  style={{ color: "#D4A574" }}
+                >
+                  Política de Privacidad
+                </a>
+                . <span style={{ color: "#D4A574" }}>*</span>
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={marketing}
+                onChange={(e) => setMarketing(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-[#D4A574]"
+              />
+              <span className="text-xs leading-relaxed text-gray-500">
+                (Opcional) Quiero recibir novedades, eventos y promociones de la Casona
+                San Martín. Puedo revocar este consentimiento cuando quiera.
+              </span>
+            </label>
+          </div>
+
           {/* Submit */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 pt-2">
             <p className="text-xs text-gray-600 max-w-xs">
@@ -205,7 +249,7 @@ export default function CotizarLocal() {
               disabled={!isValid}
               className="group inline-flex items-center justify-between gap-2 bg-primary text-black font-medium text-sm sm:text-base rounded-full pl-6 pr-1.5 py-1.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:gap-3 self-start sm:self-auto shrink-0"
             >
-              <span>{sent ? "¡Mensaje enviado!" : "Enviar por WhatsApp"}</span>
+              <span>{sent ? "¡Mensaje enviado!" : "Enviar y reservar mi visita"}</span>
               <span className="bg-black rounded-full w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center transition-transform group-hover:scale-110 group-disabled:group-hover:scale-100">
                 <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: "#D4A574" }} />
               </span>

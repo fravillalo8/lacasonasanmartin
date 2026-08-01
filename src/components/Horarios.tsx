@@ -1,5 +1,6 @@
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
+import { Link } from "react-router-dom";
 import InstagramIcon from "./icons/InstagramIcon";
 
 type Schedule = {
@@ -15,6 +16,7 @@ type Schedule = {
   ig?: string;
   igHandle?: string;
   web?: string;
+  page?: string;
 };
 
 const SCHEDULES: Schedule[] = [
@@ -40,7 +42,8 @@ const SCHEDULES: Schedule[] = [
   {
     brand: "Tiempo de Cosecha",
     tagline: "Vinos y cocina del valle",
-    logo: "/photos/logo-tiempodecosecha.png",
+    logo: "/photos/logo-tiempodecosecha.jpg",
+    page: "/tiempo-de-cosecha",
     logoBg: "bg-black",
     logoFit: "contain",
     rows: [
@@ -90,6 +93,7 @@ const SCHEDULES: Schedule[] = [
     brand: "Emulen Pilates Center",
     tagline: "Clases reformer y mat",
     logo: "/photos/ig-emulen-pilates.jpg",
+    page: "/emulen-pilates",
     logoBg: "bg-black",
     logoFit: "cover",
     rows: [
@@ -246,6 +250,15 @@ function ScheduleCard({
           >
             <span className="group-hover:underline">{schedule.phoneDisplay}</span>
           </a>
+        )}
+        {schedule.page && (
+          <Link
+            to={schedule.page}
+            className="inline-flex items-center gap-1 text-xs group ml-auto"
+            style={{ color: "rgba(212,165,116,0.6)" }}
+          >
+            <span className="group-hover:underline group-hover:text-[#D4A574] transition-colors">Ver página →</span>
+          </Link>
         )}
       </div>
     </motion.div>

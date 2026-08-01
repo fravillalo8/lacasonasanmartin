@@ -229,9 +229,10 @@ export default function Hero() {
                     ease: [0.16, 1, 0.3, 1],
                   }}
                 >
-                  Patrimonio histórico en el corazón de Rinconada, Valle de
-                  Aconcagua. Pizzería, café, moda sustentable y eventos
-                  culturales — todo en un mismo lugar con carácter e historia.
+                  Tu negocio merece un lugar con alma — y con clientes que ya
+                  están aquí. Un patrimonio colonial del Valle de Aconcagua
+                  donde siete emprendimientos ya tienen su lugar. El próximo
+                  puede ser el tuyo.
                 </motion.p>
 
                 <motion.a
@@ -247,7 +248,7 @@ export default function Hero() {
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                 >
-                  <span>Reserva tu espacio</span>
+                  <span>Quiero mi local aquí</span>
                   <span className="bg-black rounded-full w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center transition-transform group-hover:scale-110">
                     <ArrowRight
                       className="w-4 h-4 sm:w-5 sm:h-5"

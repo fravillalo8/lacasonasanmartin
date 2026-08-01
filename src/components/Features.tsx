@@ -1,5 +1,6 @@
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
+import { Link } from "react-router-dom";
 import { ArrowRight, Check } from "lucide-react";
 import WordsPullUpMultiStyle from "./WordsPullUpMultiStyle";
 
@@ -12,6 +13,7 @@ type Brand = {
   logoFit: "contain" | "cover";
   items: string[];
   href?: string;
+  page?: string;
 };
 
 const BRANDS: Brand[] = [
@@ -47,7 +49,7 @@ const BRANDS: Brand[] = [
     number: "03",
     name: "Tiempo de Cosecha",
     tagline: "Vinos y cocina del valle",
-    logo: "/photos/logo-tiempodecosecha.png",
+    logo: "/photos/logo-tiempodecosecha.jpg",
     logoBg: "bg-black",
     logoFit: "contain",
     items: [
@@ -55,7 +57,7 @@ const BRANDS: Brand[] = [
       "Cocina con producto local",
       "Lunes a sábado · hasta 21:00",
     ],
-    href: "https://www.tiempocosecha.cl/",
+    page: "/tiempo-de-cosecha",
   },
   {
     number: "04",
@@ -69,7 +71,7 @@ const BRANDS: Brand[] = [
       "Clases personalizadas",
       "Estudio luminoso en patrimonio",
     ],
-    href: "https://www.instagram.com/emulen.pilates/",
+    page: "/emulen-pilates",
   },
   {
     number: "05",
@@ -182,20 +184,35 @@ function BrandCard({ brand, index }: { brand: Brand; index: number }) {
           </li>
         ))}
       </ul>
-      <a
-        href={brand.href ?? "#"}
-        target={brand.href ? "_blank" : undefined}
-        rel={brand.href ? "noopener noreferrer" : undefined}
-        aria-label={`Conoce más sobre ${brand.name}`}
-        className="mt-5 inline-flex items-center gap-2 text-xs sm:text-sm group"
-        style={{ color: "#D4A574" }}
-      >
-        Conoce más
-        <ArrowRight
-          className="w-4 h-4 transition-transform group-hover:translate-x-1"
-          style={{ transform: "rotate(-45deg)" }}
-        />
-      </a>
+      {brand.page ? (
+        <Link
+          to={brand.page}
+          aria-label={`Ver página de ${brand.name}`}
+          className="mt-5 inline-flex items-center gap-2 text-xs sm:text-sm group"
+          style={{ color: "#D4A574" }}
+        >
+          Ver página
+          <ArrowRight
+            className="w-4 h-4 transition-transform group-hover:translate-x-1"
+            style={{ transform: "rotate(-45deg)" }}
+          />
+        </Link>
+      ) : (
+        <a
+          href={brand.href ?? "#"}
+          target={brand.href ? "_blank" : undefined}
+          rel={brand.href ? "noopener noreferrer" : undefined}
+          aria-label={`Conoce más sobre ${brand.name}`}
+          className="mt-5 inline-flex items-center gap-2 text-xs sm:text-sm group"
+          style={{ color: "#D4A574" }}
+        >
+          Conoce más
+          <ArrowRight
+            className="w-4 h-4 transition-transform group-hover:translate-x-1"
+            style={{ transform: "rotate(-45deg)" }}
+          />
+        </a>
+      )}
     </Card>
   );
 }

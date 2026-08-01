@@ -90,7 +90,7 @@ export default function Gallery() {
   const headerInView = useInView(headerRef, { once: true, margin: "-60px" });
 
   return (
-    <section className="bg-black py-24 sm:py-32 px-4 sm:px-6">
+    <section className="bg-black py-14 sm:py-20 px-4 sm:px-6">
       <div className="mx-auto max-w-7xl">
         <div ref={headerRef} className="mb-10 sm:mb-14 text-center">
           <motion.p

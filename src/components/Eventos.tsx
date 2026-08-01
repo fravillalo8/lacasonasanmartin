@@ -142,11 +142,11 @@ export default function Eventos() {
   return (
     <section
       id="eventos"
-      className="relative bg-black py-24 sm:py-32 overflow-hidden"
+      className="relative bg-black py-14 sm:py-20 overflow-hidden"
     >
       <div
         ref={headerRef}
-        className="px-4 sm:px-6 mx-auto max-w-7xl mb-10 sm:mb-14"
+        className="px-4 sm:px-6 mx-auto max-w-7xl mb-8 sm:mb-10"
       >
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
@@ -184,7 +184,7 @@ export default function Eventos() {
         </div>
       </div>
 
-      <div className="overflow-x-auto snap-x snap-mandatory pb-8 [scrollbar-width:thin]">
+      <div className="overflow-x-auto snap-x snap-mandatory pb-4 [scrollbar-width:thin]">
         <div className="flex gap-4 sm:gap-6 px-4 sm:px-6 lg:px-12 w-max">
           {EVENTS.map((event, i) => (
             <EventCard key={event.src} event={event} index={i} />

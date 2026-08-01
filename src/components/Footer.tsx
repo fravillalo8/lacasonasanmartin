@@ -1,5 +1,12 @@
 import InstagramIcon from "./icons/InstagramIcon";
 
+declare global {
+  interface Window {
+    // Definida por public/cookie-consent.js para reabrir el aviso de cookies.
+    showCookiePreferences?: () => void;
+  }
+}
+
 const NAV = [
   { label: "Nuestra Historia", href: "#historia" },
   { label: "Locales en la Casona", href: "#emprendedores" },
@@ -62,13 +69,45 @@ export default function Footer() {
         </a>
       </div>
 
-      <div className="mx-auto max-w-7xl mt-10 pt-6 border-t border-white/5 flex flex-col sm:flex-row gap-2 sm:gap-4 sm:items-center sm:justify-between">
-        <p className="text-xs text-gray-500">
-          © {new Date().getFullYear()} La Casona San Martín · Patrimonio
-          histórico
-        </p>
-        <address className="text-xs text-gray-500 not-italic">
-          Carretera San Martín 421, Paradero 10, Rinconada de los Andes
+      <div className="mx-auto max-w-7xl mt-10 pt-6 border-t border-white/5 flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 sm:items-center sm:justify-between">
+          <p className="text-xs text-gray-500">
+            © {new Date().getFullYear()} La Casona San Martín · Patrimonio histórico ·{" "}
+            <a href="/politica-privacidad.html" className="hover:text-gray-300 transition-colors">Privacidad</a>{" "}·{" "}
+            <a href="/terminos.html" className="hover:text-gray-300 transition-colors">Términos</a>{" "}·{" "}
+            <button
+              type="button"
+              onClick={() => window.showCookiePreferences?.()}
+              className="hover:text-gray-300 transition-colors underline-offset-2 hover:underline"
+            >
+              Preferencias de cookies
+            </button>
+          </p>
+          <p className="text-xs text-gray-500">
+            Página creada por{" "}
+            <a
+              href="https://timetomarket.cl"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-gray-300 transition-colors"
+            >
+              timetomarket.cl
+            </a>
+          </p>
+        </div>
+        {/* Identificación del prestador (Ley 19.496 art. 32 · Ley 21.719).
+            Reemplazar los placeholders con la razón social y RUT reales. */}
+        <address className="text-[11px] text-gray-600 not-italic leading-relaxed">
+          Responsable:{" "}
+          <span className="text-gray-500">[RAZÓN SOCIAL POR CONFIRMAR]</span> · RUT:{" "}
+          <span className="text-gray-500">[RUT POR CONFIRMAR]</span> · Carretera San Martín 421,
+          Paradero 10, Rinconada de los Andes, Región de Valparaíso ·{" "}
+          <a
+            href="mailto:contacto@lacasonasanmartin.cl"
+            className="hover:text-gray-400 transition-colors"
+          >
+            contacto@lacasonasanmartin.cl
+          </a>
         </address>
       </div>
     </footer>

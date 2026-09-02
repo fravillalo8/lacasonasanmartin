@@ -14,6 +14,7 @@ type Brand = {
   items: string[];
   href?: string;
   page?: string;
+  badge?: string;
 };
 
 const BRANDS: Brand[] = [
@@ -33,34 +34,6 @@ const BRANDS: Brand[] = [
   },
   {
     number: "02",
-    name: "Recircula Blue Point",
-    tagline: "Moda circular que inspira",
-    logo: "/photos/logo-recircula.jpg",
-    logoBg: "bg-[#f3eee5]",
-    logoFit: "contain",
-    items: [
-      "Tienda de moda sustentable",
-      "Prendas únicas con curaduría",
-      "Lunes a sábado · 10:30 – 20:00",
-    ],
-    href: "https://www.instagram.com/recircula_blue_point/",
-  },
-  {
-    number: "03",
-    name: "Tiempo de Cosecha",
-    tagline: "Vinos y cocina del valle",
-    logo: "/photos/logo-tiempodecosecha.jpg",
-    logoBg: "bg-black",
-    logoFit: "contain",
-    items: [
-      "Selección de vinos del valle",
-      "Cocina con producto local",
-      "Lunes a sábado · hasta 21:00",
-    ],
-    page: "/tiempo-de-cosecha",
-  },
-  {
-    number: "04",
     name: "Emulen Pilates Center",
     tagline: "Movimiento consciente",
     logo: "/photos/ig-emulen-pilates.jpg",
@@ -74,46 +47,19 @@ const BRANDS: Brand[] = [
     page: "/emulen-pilates",
   },
   {
-    number: "05",
-    name: "RocHelo",
-    tagline: "Cafetería y heladería",
-    logo: "/photos/logo-rochelo.jpg",
-    logoBg: "bg-[#f5f9fa]",
-    logoFit: "contain",
-    items: [
-      "Café de especialidad",
-      "Helados artesanales",
-      "Postres y dulces caseros",
-    ],
-    href: "https://www.instagram.com/rochelo/",
-  },
-  {
-    number: "06",
-    name: "Andes Car Wash",
-    tagline: "Auto lavado profesional",
-    logo: "/photos/logo-andescarwash.png",
-    logoBg: "bg-[#0f1726]",
-    logoFit: "contain",
-    items: [
-      "Lavado completo y detailing",
-      "Lun a jue · 10:30 – 18:30",
-      "Vie y sáb · 10:30 – 20:30",
-    ],
-    href: "https://www.instagram.com/andes_carwashcl/",
-  },
-  {
-    number: "07",
-    name: "Hylba de Paiva · Fitness",
-    tagline: "Gimnasia localizada brasileña",
-    logo: "/photos/logo-hylba.jpg",
-    logoBg: "bg-[#2a2a2a]",
+    number: "03",
+    name: "Punto Origen",
+    tagline: "Cafetería de especialidad",
+    logo: "/photos/punto-origen.webp",
+    logoBg: "bg-[#1c120a]",
     logoFit: "cover",
     items: [
-      "5 horarios semanales",
-      "12 clases mensuales · $55.000",
-      "AM lun-mié-vie · PM mar-jue",
+      "Café de especialidad",
+      "Espresso y bebidas de autor",
+      "Recién llegada a la Casona",
     ],
-    href: "https://www.instagram.com/hylbadepaiva.fitnesscoach45/",
+    href: "https://www.instagram.com/cafeteriapuntoorigen/",
+    badge: "Nuevo",
   },
 ];
 
@@ -146,15 +92,40 @@ function Card({ index, children, className = "" }: CardProps) {
 function BrandCard({ brand, index }: { brand: Brand; index: number }) {
   return (
     <Card index={index} className="bg-[#161616] p-6 sm:p-7 flex flex-col h-full">
+      {brand.badge && (
+        <span
+          className="absolute top-3 right-3 z-10 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider"
+          style={{ backgroundColor: "#D4A574", color: "#1a120a" }}
+        >
+          {brand.badge}
+        </span>
+      )}
       <div
-        className={`w-full aspect-[4/3] rounded-xl ${brand.logoBg} flex items-center justify-center ${brand.logoFit === "contain" ? "p-5" : ""} mb-5 overflow-hidden`}
+        className={`relative w-full aspect-[4/3] rounded-xl ${brand.logoBg} flex items-center justify-center ${brand.logo && brand.logoFit === "contain" ? "p-5" : ""} mb-5 overflow-hidden`}
       >
-        <img
-          src={brand.logo}
-          alt={`Logo de ${brand.name} — ${brand.tagline}, en Casona San Martín, Rinconada de Los Andes`}
-          loading="lazy"
-          className={`${brand.logoFit === "contain" ? "max-w-full max-h-full object-contain" : "w-full h-full object-cover"}`}
-        />
+        {brand.logo ? (
+          <img
+            src={brand.logo}
+            alt={`Logo de ${brand.name} — ${brand.tagline}, en Casona San Martín, Rinconada de Los Andes`}
+            loading="lazy"
+            className={`${brand.logoFit === "contain" ? "max-w-full max-h-full object-contain" : "w-full h-full object-cover"}`}
+          />
+        ) : (
+          <span className="flex flex-col items-center gap-1 text-center px-4">
+            <span
+              className="font-serif text-2xl sm:text-3xl leading-none"
+              style={{ color: "#E1E0CC" }}
+            >
+              {brand.name}
+            </span>
+            <span
+              className="text-[9px] uppercase tracking-[0.3em]"
+              style={{ color: "#D4A574" }}
+            >
+              {brand.tagline}
+            </span>
+          </span>
+        )}
       </div>
       <div className="flex items-baseline justify-between gap-2 mb-1">
         <h3
@@ -229,18 +200,18 @@ export default function Features() {
           <WordsPullUpMultiStyle
             segments={[
               {
-                text: "Siete emprendimientos. Un mismo patio colonial.",
+                text: "Tres marcas. Un mismo patio colonial.",
                 className: "text-cream",
               },
               {
-                text: "Cada marca con su historia. Toda Casona San Martín como hogar.",
-                className: "italic text-gray-500",
+                text: "Cada una con su historia. La próxima puede ser la tuya.",
+                className: "italic text-[#E1E0CC]/70",
               },
             ]}
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 max-w-5xl mx-auto">
           {BRANDS.map((brand, i) => (
             <BrandCard key={brand.number} brand={brand} index={i} />
           ))}

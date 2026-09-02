@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Download, Shield, Users, Database, CheckCircle2 } from 'lucide-react'
+import { hoyCL } from './api/fecha'
 
 const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api'
 
@@ -25,7 +26,9 @@ export default function Configuracion() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `mesacontrol_backup_${new Date().toISOString().slice(0, 10)}.zip`
+      // El nombre lleva el día CHILENO: un respaldo bajado a las 21:00 se
+      // llamaba con la fecha de mañana y no calzaba con el día que respalda.
+      a.download = `mesacontrol_backup_${hoyCL()}.zip`
       document.body.appendChild(a)
       a.click()
       a.remove()

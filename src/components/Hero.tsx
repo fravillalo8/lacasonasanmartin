@@ -1,12 +1,13 @@
 import {
   motion,
+  AnimatePresence,
   useMotionValue,
   useSpring,
   useTransform,
   useScroll,
 } from "framer-motion";
-import { useEffect, useRef } from "react";
-import { ArrowRight, ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
 
 const NAV_ITEMS = [
   { label: "Nuestra Historia", href: "#historia" },
@@ -44,6 +45,7 @@ function MaskedWord({
 
 export default function Hero() {
   const sectionRef = useRef<HTMLElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Mouse parallax
   const rawX = useMotionValue(0);
@@ -76,7 +78,7 @@ export default function Hero() {
         transition={{ duration: 1.4, ease: [0.4, 0, 0.2, 1], delay: 0.1 }}
       />
 
-      <section ref={sectionRef} className="h-screen w-full p-4 md:p-6">
+      <section ref={sectionRef} className="h-[100svh] w-full p-4 md:p-6">
         <div className="relative h-full w-full overflow-hidden rounded-2xl md:rounded-[2rem]">
 
           {/* Parallax image wrapper */}
@@ -97,6 +99,8 @@ export default function Hero() {
           <div className="noise-overlay pointer-events-none absolute inset-0 opacity-[0.4] mix-blend-overlay" />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-black/10 to-black/90" />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/45 via-transparent to-transparent" />
+          {/* Scrim inferior reforzado: asegura contraste del título grande sobre zonas claras (sobre todo en móvil) */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[72%] bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
 
           {/* Ambient glow bottom */}
           <motion.div
@@ -109,9 +113,9 @@ export default function Hero() {
             transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
           />
 
-          {/* Nav — staggered entrance */}
-          <nav aria-label="Navegación principal" className="absolute left-1/2 top-0 z-20 -translate-x-1/2 bg-black rounded-b-2xl md:rounded-b-3xl px-4 py-2 md:px-8">
-            <ul className="flex gap-3 sm:gap-6 md:gap-10 lg:gap-12">
+          {/* Nav escritorio — staggered entrance */}
+          <nav aria-label="Navegación principal" className="hidden sm:block absolute left-1/2 top-0 z-20 -translate-x-1/2 bg-black rounded-b-2xl md:rounded-b-3xl px-4 py-2 md:px-8">
+            <ul className="flex gap-5 md:gap-10 lg:gap-12">
               {NAV_ITEMS.map((item, i) => (
                 <motion.li
                   key={item.href}
@@ -125,7 +129,7 @@ export default function Hero() {
                 >
                   <a
                     href={item.href}
-                    className="text-[10px] sm:text-xs md:text-sm transition-colors whitespace-nowrap"
+                    className="text-xs md:text-sm transition-colors whitespace-nowrap"
                     style={{ color: "rgba(225, 224, 204, 0.8)" }}
                     onMouseEnter={(e) =>
                       (e.currentTarget.style.color = "#E1E0CC")
@@ -140,6 +144,46 @@ export default function Hero() {
               ))}
             </ul>
           </nav>
+
+          {/* Nav móvil — hamburguesa + drawer */}
+          <div className="sm:hidden absolute top-3 right-3 z-30">
+            <motion.button
+              aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((v) => !v)}
+              className="flex items-center justify-center rounded-full bg-black/70 backdrop-blur-md p-2.5 border border-white/10"
+              style={{ color: "#E1E0CC" }}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 1.3, ease: [0.16, 1, 0.3, 1] }}
+            >
+              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </motion.button>
+            <AnimatePresence>
+              {menuOpen && (
+                <motion.ul
+                  initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                  transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute right-0 mt-2 w-60 origin-top-right rounded-2xl bg-black/95 backdrop-blur-md p-2 border border-white/10 shadow-2xl"
+                >
+                  {NAV_ITEMS.map((item) => (
+                    <li key={item.href}>
+                      <a
+                        href={item.href}
+                        onClick={() => setMenuOpen(false)}
+                        className="block rounded-xl px-4 py-3 text-sm transition-colors hover:bg-white/5"
+                        style={{ color: "rgba(225, 224, 204, 0.9)" }}
+                      >
+                        {item.label}
+                      </a>
+                    </li>
+                  ))}
+                </motion.ul>
+              )}
+            </AnimatePresence>
+          </div>
 
           {/* Logo badge */}
           <motion.div
@@ -231,7 +275,7 @@ export default function Hero() {
                 >
                   Tu negocio merece un lugar con alma — y con clientes que ya
                   están aquí. Un patrimonio colonial del Valle de Aconcagua
-                  donde siete emprendimientos ya tienen su lugar. El próximo
+                  donde tres emprendimientos ya tienen su lugar. El próximo
                   puede ser el tuyo.
                 </motion.p>
 

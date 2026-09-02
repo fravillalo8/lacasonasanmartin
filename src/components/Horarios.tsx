@@ -40,56 +40,6 @@ const SCHEDULES: Schedule[] = [
     web: "https://pizzeriadimaria.cl/",
   },
   {
-    brand: "Tiempo de Cosecha",
-    tagline: "Vinos y cocina del valle",
-    logo: "/photos/logo-tiempodecosecha.jpg",
-    page: "/tiempo-de-cosecha",
-    logoBg: "bg-black",
-    logoFit: "contain",
-    rows: [
-      {
-        label: "Lunes a Viernes",
-        slots: ["10:30 — 14:00", "15:30 — 21:00"],
-      },
-      {
-        label: "Sábado",
-        slots: ["10:30 — 21:00"],
-      },
-    ],
-    note: "Domingos cerrado",
-  },
-  {
-    brand: "Recircula Blue Point",
-    tagline: "Moda circular que inspira",
-    logo: "/photos/logo-recircula.jpg",
-    logoBg: "bg-[#f3eee5]",
-    logoFit: "contain",
-    rows: [
-      {
-        label: "Lunes a Sábado",
-        slots: ["10:30 — 14:00", "16:00 — 20:00"],
-      },
-    ],
-    note: "Domingos cerrado",
-  },
-  {
-    brand: "Andes Car Wash",
-    tagline: "Auto lavado profesional",
-    logo: "/photos/logo-andescarwash.png",
-    logoBg: "bg-[#0f1726]",
-    logoFit: "contain",
-    rows: [
-      {
-        label: "Lunes a Jueves",
-        slots: ["10:30 — 18:30"],
-      },
-      {
-        label: "Viernes y Sábado",
-        slots: ["10:30 — 20:30"],
-      },
-    ],
-  },
-  {
     brand: "Emulen Pilates Center",
     tagline: "Clases reformer y mat",
     logo: "/photos/ig-emulen-pilates.jpg",
@@ -111,26 +61,20 @@ const SCHEDULES: Schedule[] = [
     igHandle: "@emulen.pilates",
   },
   {
-    brand: "Hylba de Paiva · Fitness",
-    tagline: "Gimnasia localizada brasileña",
-    logo: "/photos/logo-hylba.jpg",
-    logoBg: "bg-[#2a2a2a]",
-    logoFit: "cover",
+    brand: "Punto Origen",
+    tagline: "Cafetería de especialidad",
+    logo: "/photos/logo-punto-origen.webp",
+    logoBg: "bg-[#f5f1e8]",
+    logoFit: "contain",
     rows: [
       {
-        label: "AM · Lun · Mié · Vie",
-        slots: ["10:00 — 10:45"],
-      },
-      {
-        label: "PM · Mar · Jue",
-        slots: ["19:00 — 19:45"],
+        label: "Apertura",
+        slots: ["Próximamente"],
       },
     ],
-    note: "12 clases mensuales · $55.000",
-    phone: "+56976159062",
-    phoneDisplay: "+56 9 7615 9062",
-    ig: "https://www.instagram.com/hylbadepaiva.fitnesscoach45/",
-    igHandle: "@hylbadepaiva.fitnesscoach45",
+    note: "Recién llegada a la Casona — pronto carta y horarios.",
+    ig: "https://www.instagram.com/cafeteriapuntoorigen/",
+    igHandle: "@cafeteriapuntoorigen",
   },
 ];
 
@@ -158,18 +102,31 @@ function ScheduleCard({
     >
       <div className="flex items-center gap-4 mb-5">
         <div
-          className={`w-16 h-16 rounded-xl ${schedule.logoBg} flex items-center justify-center ${fit === "contain" ? "p-2" : ""} overflow-hidden shrink-0`}
+          className={`w-16 h-16 rounded-xl ${schedule.logoBg} flex items-center justify-center ${schedule.logo && fit === "contain" ? "p-2" : ""} overflow-hidden shrink-0`}
         >
-          <img
-            src={schedule.logo}
-            alt={`Logo de ${schedule.brand} — ${schedule.tagline}`}
-            loading="lazy"
-            className={
-              fit === "contain"
-                ? "max-w-full max-h-full object-contain"
-                : "w-full h-full object-cover"
-            }
-          />
+          {schedule.logo ? (
+            <img
+              src={schedule.logo}
+              alt={`Logo de ${schedule.brand} — ${schedule.tagline}`}
+              loading="lazy"
+              className={
+                fit === "contain"
+                  ? "max-w-full max-h-full object-contain"
+                  : "w-full h-full object-cover"
+              }
+            />
+          ) : (
+            <span
+              className="font-serif text-xl leading-none"
+              style={{ color: "#D4A574" }}
+            >
+              {schedule.brand
+                .split(" ")
+                .map((w) => w[0])
+                .join("")
+                .slice(0, 2)}
+            </span>
+          )}
         </div>
         <div className="min-w-0">
           <h3
@@ -291,7 +248,7 @@ export default function Horarios() {
         </div>
 
         <p className="text-center text-gray-500 text-xs sm:text-sm mt-10 sm:mt-12 max-w-xl mx-auto">
-          RocHelo ajusta sus horarios cada semana.
+          Algunos locales ajustan sus horarios cada semana.
           Síguenos en{" "}
           <a
             href="https://www.instagram.com/casonasanmartin/"

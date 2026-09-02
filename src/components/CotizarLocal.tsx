@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, UtensilsCrossed, ShoppingBag, Dumbbell, Palette, Briefcase, HelpCircle } from "lucide-react";
+import { ArrowRight, UtensilsCrossed, ShoppingBag, Dumbbell, Palette, Briefcase, HelpCircle, SquareParking, Landmark, TrendingUp, Users } from "lucide-react";
+
+type Beneficio = { title: string; desc: string; Icon: React.ElementType; highlight?: boolean };
+
+const BENEFICIOS: Beneficio[] = [
+  { title: "Gran estacionamiento", desc: "Tus clientes llegan y estacionan fácil dentro del predio — algo escaso en la zona.", Icon: SquareParking, highlight: true },
+  { title: "Patrimonio único", desc: "Un inmueble colonial reconocido en todo el Valle del Aconcagua.", Icon: Landmark },
+  { title: "Alto tránsito", desc: "Sobre la Carretera San Martín, con flujo constante de visitantes.", Icon: TrendingUp },
+  { title: "Comunidad", desc: "Emprendimientos que se potencian y clientes fieles que ya vienen.", Icon: Users },
+];
 
 type Tipo = {
   id: string;
@@ -87,6 +96,35 @@ export default function CotizarLocal() {
           >
             Cuéntanos tu proyecto y te cotizamos en menos de 24 horas.
           </motion.p>
+        </div>
+
+        {/* Por qué la Casona — argumentos de arriendo */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-12 sm:mb-16">
+          {BENEFICIOS.map((b, i) => (
+            <motion.div
+              key={b.title}
+              className={`rounded-2xl border p-4 sm:p-5 ${
+                b.highlight
+                  ? "border-[#D4A574]/45 bg-[#D4A574]/[0.07]"
+                  : "border-white/8 bg-[#111111]"
+              }`}
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <b.Icon className="w-5 h-5 mb-3" style={{ color: "#D4A574" }} />
+              <p
+                className="font-serif text-sm sm:text-base leading-tight mb-1"
+                style={{ color: "#E1E0CC" }}
+              >
+                {b.title}
+              </p>
+              <p className="text-[11px] sm:text-xs leading-snug text-gray-400">
+                {b.desc}
+              </p>
+            </motion.div>
+          ))}
         </div>
 
         <motion.form

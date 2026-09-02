@@ -16,8 +16,8 @@ export default function AnimatedLetter({
   const charProgress = index / total;
   const opacity = useTransform(
     progress,
-    [charProgress - 0.1, charProgress + 0.05],
-    [0.2, 1],
+    [charProgress - 0.12, charProgress + 0.04],
+    [0.55, 1],
   );
   return (
     <motion.span style={{ opacity }} className="inline">

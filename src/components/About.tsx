@@ -10,7 +10,7 @@ export default function About() {
   const ref = useRef<HTMLParagraphElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
-    offset: ["start 0.8", "end 0.2"],
+    offset: ["start 0.9", "end 0.55"],
   });
 
   const words = PARAGRAPH.split(" ");
@@ -18,33 +18,24 @@ export default function About() {
 
   return (
     <section id="historia" className="bg-black py-14 sm:py-20 px-4 sm:px-6">
-      <div className="bg-[#101010] mx-auto max-w-6xl rounded-3xl px-6 sm:px-10 py-16 sm:py-24 text-center">
+      <div className="bg-[#101010] mx-auto max-w-6xl rounded-3xl px-6 sm:px-10 py-12 sm:py-16 text-center">
         <motion.div
-          className="relative mx-auto mb-8 sm:mb-12 w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52"
+          className="relative mx-auto mb-7 sm:mb-10 w-32 h-32 sm:w-40 sm:h-40 md:w-44 md:h-44"
           initial={{ opacity: 0, scale: 0.85 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
         >
           <motion.div
-            className="absolute -inset-2 rounded-full bg-primary/20 blur-2xl"
-            animate={{ opacity: [0.4, 0.7, 0.4], scale: [1, 1.05, 1] }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.div
-            className="absolute -inset-1 rounded-full"
-            style={{
-              background:
-                "conic-gradient(from 0deg, #D4A574, #C1614A, #D4A574)",
-            }}
-            animate={{ rotate: 360 }}
-            transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
+            className="absolute -inset-2 rounded-full bg-primary/15 blur-2xl"
+            animate={{ opacity: [0.35, 0.6, 0.35] }}
+            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
           />
           <img
             src="/photos/logo-casona.jpg"
             alt="Logo de Casona San Martín, patrimonio histórico colonial en Rinconada de Los Andes, Valle de Aconcagua"
             loading="lazy"
-            className="relative w-full h-full rounded-full object-cover ring-2 ring-black"
+            className="relative w-full h-full rounded-full object-cover ring-1 ring-[#D4A574]/45"
           />
         </motion.div>
 

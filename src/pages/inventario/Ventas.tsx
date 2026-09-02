@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from './api/client'
 import type { VentaDetalle, VentasResumen } from './api/client'
+import { hoyCL, haceDiasCL } from './api/fecha'
 import { Banknote, CreditCard, Smartphone, TrendingUp, Receipt, ChevronDown, ChevronUp } from 'lucide-react'
 
 function clpFormat(n: number) {
@@ -97,10 +98,11 @@ function VentaRow({ venta }: { venta: VentaDetalle }) {
   )
 }
 
-const today = () => new Date().toISOString().slice(0, 10)
-const daysAgo = (n: number) => {
-  const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10)
-}
+/* Ambas en hora de Chile — ver api/fecha.ts. Con la fecha en UTC, después de
+   las 20:00 el rango «últimos 30 días» se corría un día completo y el resumen
+   de ventas del turno de la noche caía fuera del día que el local vivió. */
+const today = () => hoyCL()
+const daysAgo = (n: number) => haceDiasCL(n)
 
 export default function Ventas() {
   const [ventas, setVentas] = useState<VentaDetalle[]>([])

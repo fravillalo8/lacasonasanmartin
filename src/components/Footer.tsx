@@ -16,7 +16,7 @@ const NAV = [
 
 export default function Footer() {
   return (
-    <footer className="bg-black border-t border-white/5 py-12 sm:py-14 px-4 sm:px-6">
+    <footer className="bg-black border-t border-white/5 pt-12 pb-28 sm:py-14 px-4 sm:px-6">
       <div className="mx-auto max-w-7xl flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
         <a href="#" className="flex items-center gap-4">
           <img

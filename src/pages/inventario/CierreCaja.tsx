@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from './api/client'
+import { hoyCL } from './api/fecha'
 import type { CierreCaja, GastoIn } from './api/client'
 import { Wallet, Plus, Trash2, Banknote, CreditCard, Smartphone, TrendingUp, TrendingDown } from 'lucide-react'
 
@@ -7,7 +8,9 @@ function clpFormat(n: number) {
   return `$${Math.round(n).toLocaleString('es-CL')}`
 }
 
-const today = () => new Date().toISOString().slice(0, 10)
+/* El día del LOCAL, en hora de Chile. Ver api/fecha.ts: el cierre de caja se
+   hace después de las 20:00, cuando la fecha en UTC ya es la de mañana. */
+const today = () => hoyCL()
 
 const CATEGORIAS = ['personal', 'servicios', 'insumos', 'otros']
 

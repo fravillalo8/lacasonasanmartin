@@ -173,7 +173,7 @@ export default function Eventos() {
             </div>
           </div>
           <motion.p
-            className="text-gray-500 text-sm sm:text-base max-w-md"
+            className="text-[#E1E0CC]/70 text-sm sm:text-base max-w-md"
             initial={{ opacity: 0, y: 10 }}
             animate={headerInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.25 }}

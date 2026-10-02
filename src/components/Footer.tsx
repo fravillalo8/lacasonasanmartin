@@ -86,7 +86,7 @@ export default function Footer() {
           <p className="text-xs text-gray-500">
             Página creada por{" "}
             <a
-              href="https://timetomarket.cl"
+              href="https://timetomarket.cl/casona-sanmartin"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-gray-300 transition-colors"
